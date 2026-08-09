@@ -1,0 +1,197 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Founder.env design system.
+ * Dark, technical, editorial. All values are runtime-overridable by the
+ * appearance_settings row served from the backend.
+ */
+
+@theme inline {
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+
+  --font-display: var(--font-heading);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono-stack);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-elevated: var(--elevated);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--elevated);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--accent);
+  --color-primary-foreground: oklch(1 0 0);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--muted-text);
+  --color-subtle: var(--secondary-text);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-accent-foreground: oklch(1 0 0);
+  --color-destructive: oklch(0.62 0.21 25);
+  --color-destructive-foreground: oklch(1 0 0);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--border-strong);
+  --color-ring: var(--accent);
+}
+
+:root {
+  --font-heading: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono-stack: "Geist Mono", "IBM Plex Mono", ui-monospace, monospace;
+
+  --background: #050507;
+  --background-2: #08090c;
+  --surface: #0b0c10;
+  --surface-2: #08090c;
+  --elevated: #0e0f14;
+
+  --foreground: #f4f4f5;
+  --secondary-text: #a1a1aa;
+  --muted-text: #71717a;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  --accent: #7c5cff;
+  --accent-2: #9b7bff;
+  --accent-glow: rgba(124, 92, 255, 0.18);
+  --logo-blue: #54b5ff;
+
+  --shell: 1320px;
+  --glow: 0.18;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--foreground);
+  }
+
+  ::selection {
+    background: var(--accent-glow);
+  }
+}
+
+@utility shell {
+  width: 100%;
+  max-width: var(--shell);
+  margin-inline: auto;
+  padding-inline: 20px;
+  @media (min-width: 768px) {
+    padding-inline: 32px;
+  }
+  @media (min-width: 1200px) {
+    padding-inline: 56px;
+  }
+}
+
+/* Small uppercase technical label */
+@utility label {
+  font-family: var(--font-mono-stack);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+}
+
+@utility meta {
+  font-family: var(--font-mono-stack);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+}
+
+@utility panel {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+@utility hairline {
+  border-top: 1px solid var(--border);
+}
+
+@utility accent-glow {
+  box-shadow: 0 0 80px var(--accent-glow);
+}
+
+@utility row-link {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background-color: var(--surface);
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    transform 0.25s ease;
+}
+
+@utility fade-up {
+  animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
