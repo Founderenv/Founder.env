@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Sora', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  :root {
+    --brand-50: #eefdf5;
+    --brand-100: #d6f9e7;
+    --brand-200: #b0f1d0;
+    --brand-300: #79e3b1;
+    --brand-400: #41cc8b;
+    --brand-500: #1bb370;
+    --brand-600: #109a59;
+    --brand-700: #0f7a49;
+    --brand-800: #11613c;
+    --brand-900: #114f33;
+    --brand-950: #052e1c;
+  }
+
+  * {
+    @apply border-gray-200 dark:border-gray-800;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply overflow-x-hidden bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+    font-variation-settings: 'opsz' 32;
+  }
+
+  ::selection {
+    @apply bg-brand-500/20;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400 dark:bg-gray-600;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-brand-700 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:bg-gray-200 active:scale-[0.98] dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:bg-gray-50 active:scale-[0.98] dark:border-gray-800 dark:text-gray-100 dark:hover:bg-gray-900;
+  }
+  .card {
+    @apply rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900;
+  }
+  .input {
+    @apply w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100 dark:placeholder-gray-500;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  .section-title {
+    @apply text-lg font-semibold text-gray-900 dark:text-gray-100;
+  }
+  .skeleton {
+    @apply animate-pulse rounded-md bg-gray-200 dark:bg-gray-800;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .no-tap {
+    -webkit-tap-highlight-color: transparent;
+  }
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+  }
+  .snap-center {
+    scroll-snap-align: center;
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  .animate-progress {
+    animation: progress linear forwards;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+@keyframes scratch-sweep {
+  from { width: 100%; }
+  to { width: 0%; }
+}
