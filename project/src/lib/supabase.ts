@@ -14,7 +14,14 @@ if (requestedMode === 'supabase' && !isSupabaseConfigured) {
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabaseAnonKey!, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-      realtime: { params: { eventsPerSecond: 10 } },
+      realtime: {
+        params: { eventsPerSecond: 10 },
+        accessToken: async () => {
+          if (!supabase) return null;
+          const { data } = await supabase.auth.getSession();
+          return data.session?.access_token ?? null;
+        },
+      },
     })
   : null;
 
