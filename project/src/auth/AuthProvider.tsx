@@ -58,11 +58,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
       if (error) { setLoading(false); return; }
       setSession(data.session);
+      if (data.session?.access_token) supabase.realtime.setAuth(data.session.access_token);
       try { await loadProfile(data.session?.user.id); } finally { if (mounted) setLoading(false); }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
+      if (nextSession?.access_token) supabase.realtime.setAuth(nextSession.access_token);
       void loadProfile(nextSession?.user.id).catch(() => setProfile(null));
     });
     return () => { mounted = false; listener.subscription.unsubscribe(); };

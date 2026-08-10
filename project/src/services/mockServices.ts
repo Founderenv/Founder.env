@@ -112,7 +112,14 @@ export const mockBusinessService = {
   async getByOwner(ownerId: string): Promise<Business[]> {
     return delay(clone(businesses.filter((b) => b.ownerId === ownerId)));
   },
-  async update(id: string, updates: Partial<Business>): Promise<Business | null> {
+  async create(input: Partial<Business>, _assets: { logo?: File; cover?: File; gallery?: File[] } = {}): Promise<Business> {
+    void _assets;
+    const created = { ...businesses[0], ...input, id: `biz_${Date.now()}`, ownerId: input.ownerId ?? 'owner_current', status: 'pending' } as Business;
+    businesses.push(created);
+    return delay(clone(created));
+  },
+  async update(id: string, updates: Partial<Business>, _assets: { logo?: File; cover?: File; gallery?: File[] } = {}): Promise<Business | null> {
+    void _assets;
     const idx = businesses.findIndex((b) => b.id === id);
     if (idx === -1) return delay(null);
     businesses[idx] = { ...businesses[idx], ...updates };
@@ -121,6 +128,7 @@ export const mockBusinessService = {
 };
 
 export const mockPostService = {
+  async create(_businessId: string, _input: { type: Post['type']; caption: string; location?: string; ctaLabel?: string; ctaLink?: string }, _file?: File): Promise<string> { void _businessId; void _input; void _file; return delay(`post_${Date.now()}`); },
   async getFeed(): Promise<Post[]> {
     return delay(clone(posts));
   },
@@ -171,6 +179,7 @@ export const mockPostService = {
 };
 
 export const mockDealService = {
+  async create(_businessId: string, _input: { title: string; description: string; originalPrice: number; offerPrice: number; discount: number; startsAt: string; endsAt: string; maxClaims?: number; terms?: string; ctaLabel?: string }, _file?: File): Promise<string> { void _businessId; void _input; void _file; return delay(`deal_${Date.now()}`); },
   async getAll(): Promise<Deal[]> {
     return delay(clone(deals));
   },
@@ -211,6 +220,7 @@ export const mockDealService = {
 };
 
 export const mockStoryService = {
+  async create(_businessId: string, _input: { storyType: string; caption?: string }, _file?: File): Promise<string> { void _businessId; void _input; void _file; return delay(`story_${Date.now()}`); },
   async getAll(): Promise<Story[]> {
     return delay(clone(stories));
   },
@@ -303,6 +313,12 @@ export const mockMessageService = {
       conv.lastMessageAt = m.createdAt;
     }
     return delay(clone(m));
+  },
+  async sendMedia(conversationId: string, file: File): Promise<Message> {
+    void file;
+    const message: Message = { id: `msg_${Date.now()}`, conversationId, senderId: 'mock-user', senderType: 'customer', imageUrl: '', isRead: false, createdAt: new Date().toISOString() };
+    messages.push(message);
+    return delay(clone(message));
   },
   async markRead(conversationId: string): Promise<void> {
     messages.forEach((m) => { if (m.conversationId === conversationId) m.isRead = true; });
@@ -415,6 +431,7 @@ export const mockScratchService = {
 };
 
 export const mockVideoService = {
+  async create(_businessId: string, _input: { caption: string; dealId?: string; music?: string }, _file: File): Promise<string> { void _businessId; void _input; void _file; return delay(`clip_${Date.now()}`); },
   async getAll(): Promise<VideoClip[]> {
     return delay(clone(videoClips));
   },

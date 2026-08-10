@@ -1,5 +1,6 @@
 begin;
 
+create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 create extension if not exists citext with schema extensions;
 
@@ -137,7 +138,7 @@ create table public.deals (
 create table public.deal_claims (
   id uuid primary key default gen_random_uuid(), deal_id uuid not null references public.deals(id) on delete restrict,
   customer_id uuid not null references public.profiles(id) on delete restrict, status public.deal_claim_status not null default 'claimed',
-  claim_code text not null unique default encode(gen_random_bytes(8), 'hex'), claimed_at timestamptz not null default timezone('utc', now()), redeemed_at timestamptz,
+  claim_code text not null unique default encode(extensions.gen_random_bytes(8), 'hex'), claimed_at timestamptz not null default timezone('utc', now()), redeemed_at timestamptz,
   unique(deal_id, customer_id)
 );
 create table public.saved_deals (
@@ -229,18 +230,20 @@ create table public.reward_campaigns (
   id uuid primary key default gen_random_uuid(), business_id uuid not null references public.businesses(id) on delete cascade,
   name text not null, reward_type text not null, reward_value text not null, min_purchase numeric(12,2), starts_at timestamptz not null,
   ends_at timestamptz not null, max_claims integer, status public.content_status not null default 'draft', created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()), check(ends_at > starts_at)
+  updated_at timestamptz not null default timezone('utc', now()), check(ends_at > starts_at),
+  check(min_purchase is null or min_purchase >= 0), check(max_claims is null or max_claims > 0)
 );
 create table public.reward_claims (
   id uuid primary key default gen_random_uuid(), campaign_id uuid not null references public.reward_campaigns(id) on delete restrict,
   customer_id uuid not null references public.profiles(id) on delete restrict, status public.reward_claim_status not null default 'available',
-  reward_code text not null unique default encode(gen_random_bytes(8), 'hex'), created_at timestamptz not null default timezone('utc', now()), redeemed_at timestamptz,
+  reward_code text not null unique default encode(extensions.gen_random_bytes(8), 'hex'), created_at timestamptz not null default timezone('utc', now()), redeemed_at timestamptz,
   unique(campaign_id, customer_id)
 );
 create table public.scratch_campaigns (
   id uuid primary key default gen_random_uuid(), business_id uuid not null references public.businesses(id) on delete cascade,
   name text not null, outcomes jsonb not null check(jsonb_typeof(outcomes) = 'array'), max_plays integer, starts_at timestamptz not null,
-  ends_at timestamptz not null, status public.content_status not null default 'draft', created_at timestamptz not null default timezone('utc', now()), check(ends_at > starts_at)
+  ends_at timestamptz not null, status public.content_status not null default 'draft', created_at timestamptz not null default timezone('utc', now()),
+  check(ends_at > starts_at), check(max_plays is null or max_plays > 0)
 );
 create table public.scratch_plays (
   id uuid primary key default gen_random_uuid(), campaign_id uuid not null references public.scratch_campaigns(id) on delete restrict,
@@ -254,7 +257,7 @@ create table public.referral_campaigns (
   name text not null, friend_reward text not null, referrer_reward text not null, qualifying_action text not null,
   min_purchase numeric(12,2), max_rewards integer, starts_at timestamptz not null, ends_at timestamptz not null,
   status public.content_status not null default 'draft', created_at timestamptz not null default timezone('utc', now()), updated_at timestamptz not null default timezone('utc', now()),
-  check(ends_at > starts_at)
+  check(ends_at > starts_at), check(min_purchase is null or min_purchase >= 0), check(max_rewards is null or max_rewards > 0)
 );
 create table public.referrals (
   id uuid primary key default gen_random_uuid(), business_id uuid not null references public.businesses(id) on delete cascade,
@@ -321,23 +324,36 @@ create table public.admin_audit_logs (
 create index businesses_owner_idx on public.businesses(owner_id);
 create index businesses_active_category_idx on public.businesses(category, created_at desc) where is_active;
 create index business_followers_customer_idx on public.business_followers(customer_id, created_at desc);
+create index post_likes_customer_idx on public.post_likes(customer_id, created_at desc);
+create index saved_posts_customer_idx on public.saved_posts(customer_id, created_at desc);
+create index reposts_customer_idx on public.reposts(customer_id, created_at desc);
 create index posts_business_published_idx on public.posts(business_id, created_at desc) where status = 'published';
 create index post_comments_post_idx on public.post_comments(post_id, created_at);
+create index story_views_viewer_idx on public.story_views(viewer_id, created_at desc);
 create index stories_business_active_idx on public.stories(business_id, expires_at desc) where status = 'published';
 create index deals_business_active_idx on public.deals(business_id, ends_at desc) where status = 'published';
 create index deal_claims_customer_idx on public.deal_claims(customer_id, claimed_at desc);
 create index saved_deals_customer_idx on public.saved_deals(customer_id, created_at desc);
+create index deal_clips_business_published_idx on public.deal_clips(business_id, created_at desc) where status = 'published';
+create index deal_clip_likes_customer_idx on public.deal_clip_likes(customer_id, created_at desc);
+create index saved_deal_clips_customer_idx on public.saved_deal_clips(customer_id, created_at desc);
 create index reviews_business_approved_idx on public.reviews(business_id, created_at desc) where status = 'approved';
+create index reviews_customer_idx on public.reviews(customer_id, created_at desc);
 create index conversations_customer_idx on public.conversations(customer_id, updated_at desc);
 create index conversations_business_idx on public.conversations(business_id, updated_at desc);
 create index messages_conversation_idx on public.messages(conversation_id, created_at);
 create index notifications_recipient_idx on public.notifications(recipient_user_id, created_at desc);
 create index qr_scans_qr_idx on public.qr_scans(qr_code_id, created_at desc);
+create index reward_claims_customer_idx on public.reward_claims(customer_id, created_at desc);
+create index scratch_plays_customer_idx on public.scratch_plays(customer_id, created_at desc);
 create index referrals_referrer_idx on public.referrals(referrer_customer_id, created_at desc);
+create index referrals_referred_idx on public.referrals(referred_customer_id, created_at desc) where referred_customer_id is not null;
+create index loyalty_members_customer_idx on public.loyalty_members(customer_id, joined_at desc);
 create index loyalty_transactions_member_idx on public.loyalty_transactions(member_id, created_at);
 create index payments_business_idx on public.payments(business_id, created_at desc);
 create index reports_status_idx on public.reports(status, created_at desc);
 create index analytics_business_type_idx on public.analytics_events(business_id, event_type, created_at desc);
+create index analytics_user_idx on public.analytics_events(user_id, created_at desc) where user_id is not null;
 create index admin_audit_created_idx on public.admin_audit_logs(created_at desc);
 
 create trigger profiles_updated before update on public.profiles for each row execute function public.set_updated_at();

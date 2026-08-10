@@ -6,13 +6,19 @@ select r.id, r.business_id, r.customer_id, p.display_name as customer_name, p.av
   (select count(*)::bigint from public.review_helpful h where h.review_id = r.id) as helpful_count,
   (select jsonb_build_object('id', rr.id, 'text', rr.reply_text, 'created_at', rr.created_at)
    from public.review_replies rr where rr.review_id = r.id) as reply
-from public.reviews r join public.profiles p on p.id = r.customer_id
+from public.reviews r
+join public.profiles p on p.id = r.customer_id and p.status = 'active'
+join public.businesses b on b.id = r.business_id and b.is_active and b.lifecycle in ('active','grace_period','lite')
 where r.status = 'approved';
 
 create or replace view public.post_comments_public with (security_barrier = true) as
 select c.id, c.post_id, c.author_id, p.display_name as author_name, p.avatar_url as author_avatar,
   p.role as author_role, c.parent_comment_id, c.body, c.created_at, c.updated_at
-from public.post_comments c join public.profiles p on p.id = c.author_id where c.status = 'published';
+from public.post_comments c
+join public.profiles p on p.id = c.author_id and p.status = 'active'
+join public.posts post on post.id = c.post_id and post.status = 'published'
+join public.businesses b on b.id = post.business_id and b.is_active and b.lifecycle in ('active','grace_period','lite')
+where c.status = 'published';
 
 grant select on public.reviews_public, public.post_comments_public to anon, authenticated;
 
