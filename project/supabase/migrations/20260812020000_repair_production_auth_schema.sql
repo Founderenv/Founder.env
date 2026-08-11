@@ -1,8 +1,9 @@
 -- ============================================================================
 -- FOUNDER.ENV — PRODUCTION AUTH & SCHEMA REPAIR MIGRATION
 -- File: project/supabase/migrations/20260812020000_repair_production_auth_schema.sql
--- Description: Completely safe, 100% idempotent repair script for Supabase.
--- Can be run safely multiple times in Supabase SQL Editor without errors.
+-- Description: Fully idempotent, fail-safe SQL script for PostgreSQL / Supabase.
+-- Uses pg_type + pg_namespace joins and EXCEPTION WHEN duplicate_object handlers
+-- so it can be safely re-run multiple times against any existing schema.
 -- ============================================================================
 
 begin;
@@ -15,58 +16,176 @@ create extension if not exists pgcrypto with schema extensions;
 create extension if not exists citext with schema extensions;
 
 -- ============================================================================
--- 2. ENUM TYPES (Idempotent creation)
+-- 2. ENUM TYPES (Fully Idempotent with pg_namespace + EXCEPTION handler)
 -- ============================================================================
+
+-- app_role
 do $$ begin
-  if not exists (select 1 from pg_type where typname = 'app_role') then
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'app_role' and n.nspname = 'public'
+  ) then
     create type public.app_role as enum ('customer', 'business_owner', 'admin');
   end if;
-  if not exists (select 1 from pg_type where typname = 'business_lifecycle') then
+exception when duplicate_object then null;
+end $$;
+
+-- business_lifecycle
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'business_lifecycle' and n.nspname = 'public'
+  ) then
     create type public.business_lifecycle as enum ('draft', 'pending_activation', 'active', 'grace_period', 'lite', 'suspended');
   end if;
-  if not exists (select 1 from pg_type where typname = 'content_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- content_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'content_status' and n.nspname = 'public'
+  ) then
     create type public.content_status as enum ('draft', 'published', 'archived', 'removed');
   end if;
-  if not exists (select 1 from pg_type where typname = 'follow_source') then
+exception when duplicate_object then null;
+end $$;
+
+-- follow_source
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'follow_source' and n.nspname = 'public'
+  ) then
     create type public.follow_source as enum ('qr', 'profile', 'deal', 'referral', 'explore', 'share');
   end if;
-  if not exists (select 1 from pg_type where typname = 'media_type') then
+exception when duplicate_object then null;
+end $$;
+
+-- media_type
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'media_type' and n.nspname = 'public'
+  ) then
     create type public.media_type as enum ('image', 'video');
   end if;
-  if not exists (select 1 from pg_type where typname = 'deal_claim_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- deal_claim_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'deal_claim_status' and n.nspname = 'public'
+  ) then
     create type public.deal_claim_status as enum ('claimed', 'redeemed', 'expired', 'cancelled');
   end if;
-  if not exists (select 1 from pg_type where typname = 'review_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- review_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'review_status' and n.nspname = 'public'
+  ) then
     create type public.review_status as enum ('pending', 'approved', 'removed');
   end if;
-  if not exists (select 1 from pg_type where typname = 'reward_claim_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- reward_claim_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'reward_claim_status' and n.nspname = 'public'
+  ) then
     create type public.reward_claim_status as enum ('available', 'redeemed', 'expired', 'cancelled');
   end if;
-  if not exists (select 1 from pg_type where typname = 'referral_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- referral_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'referral_status' and n.nspname = 'public'
+  ) then
     create type public.referral_status as enum ('pending', 'qualified', 'rewarded', 'expired', 'rejected');
   end if;
-  if not exists (select 1 from pg_type where typname = 'loyalty_type') then
+exception when duplicate_object then null;
+end $$;
+
+-- loyalty_type
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'loyalty_type' and n.nspname = 'public'
+  ) then
     create type public.loyalty_type as enum ('visit', 'points', 'spend');
   end if;
-  if not exists (select 1 from pg_type where typname = 'subscription_plan') then
+exception when duplicate_object then null;
+end $$;
+
+-- subscription_plan
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'subscription_plan' and n.nspname = 'public'
+  ) then
     create type public.subscription_plan as enum ('lite', 'pro');
   end if;
-  if not exists (select 1 from pg_type where typname = 'subscription_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- subscription_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'subscription_status' and n.nspname = 'public'
+  ) then
     create type public.subscription_status as enum ('pending', 'active', 'grace_period', 'past_due', 'cancelled', 'expired');
   end if;
-  if not exists (select 1 from pg_type where typname = 'payment_type') then
+exception when duplicate_object then null;
+end $$;
+
+-- payment_type
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'payment_type' and n.nspname = 'public'
+  ) then
     create type public.payment_type as enum ('activation', 'subscription', 'promotion', 'template', 'other');
   end if;
-  if not exists (select 1 from pg_type where typname = 'payment_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- payment_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'payment_status' and n.nspname = 'public'
+  ) then
     create type public.payment_status as enum ('pending', 'success', 'failed', 'refunded', 'partially_refunded');
   end if;
-  if not exists (select 1 from pg_type where typname = 'report_status') then
+exception when duplicate_object then null;
+end $$;
+
+-- report_status
+do $$ begin
+  if not exists (
+    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'report_status' and n.nspname = 'public'
+  ) then
     create type public.report_status as enum ('pending', 'reviewed', 'dismissed', 'actioned');
   end if;
+exception when duplicate_object then null;
 end $$;
 
 -- ============================================================================
--- 3. PROFILES TABLE & COLUMNS (Idempotent column additions)
+-- 3. PROFILES TABLE & COLUMNS (Safe ADD COLUMN IF NOT EXISTS)
 -- ============================================================================
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade
