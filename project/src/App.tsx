@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AppShell } from '@/components/layout/AppShell';
 import { FeedSkeleton } from '@/components/ui/States';
 import { useRole } from '@/hooks/useTheme';
-import { useAuth, type DatabaseRole } from '@/auth/AuthProvider';
+import { useAuth, type DatabaseRole, resolvePostAuthRoute } from '@/auth/AuthProvider';
 
 // ── Lazy imports ──────────────────────────────────────────────────────────────
 const LandingPage = lazy(() => import('@/pages/landing/LandingPage').then((m) => ({ default: m.LandingPage })));
@@ -71,15 +71,7 @@ function Home() {
   if (role === 'admin') return <Navigate to="/admin" replace />;
 
   if (role === 'owner') {
-    // Owner — check onboarding and payment state
-    if (!profile?.onboardingComplete) return <Navigate to="/onboarding" replace />;
-    if (!ownerBusiness) {
-      // No business yet despite onboardingComplete=true (edge case) → restart onboarding
-      return <Navigate to="/onboarding" replace />;
-    }
-    if (ownerBusiness.paymentGate === 'pending') return <Navigate to="/owner/payment-pending" replace />;
-    if (ownerBusiness.paymentGate === 'suspended') return <Navigate to="/owner/payment-pending" replace />;
-    return <Navigate to="/owner/analytics" replace />;
+    return <Navigate to={resolvePostAuthRoute(profile, ownerBusiness)} replace />;
   }
 
   // customer

@@ -77,6 +77,29 @@ function mapOwnerBusiness(row: Record<string, unknown>): OwnerBusinessState {
   };
 }
 
+/**
+ * Centralized Post-Auth Resolver
+ * Single trusted authority for routing authenticated users based on
+ * role, onboarding state, and owner business payment gate.
+ */
+export function resolvePostAuthRoute(
+  profile: AuthProfile | null,
+  ownerBusiness: OwnerBusinessState | null
+): string {
+  if (!profile) return '/auth';
+  if (profile.role === 'admin') return '/admin';
+  if (profile.role === 'customer') return '/';
+  if (profile.role === 'business_owner') {
+    if (!profile.onboardingComplete) return '/onboarding';
+    if (!ownerBusiness) return '/onboarding';
+    if (ownerBusiness.paymentGate === 'pending' || ownerBusiness.paymentGate === 'suspended') {
+      return '/owner/payment-pending';
+    }
+    return '/owner/analytics';
+  }
+  return '/';
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
@@ -114,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const client = supabase;
     if (!client) { setLoading(false); return; }
     let mounted = true;
+
     client.auth.getSession().then(async ({ data, error }) => {
       if (!mounted) return;
       if (error) { setLoading(false); return; }
@@ -123,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try { await loadProfile(data.session?.user.id); } finally { if (mounted) setLoading(false); }
     });
+
     const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
       setSession(nextSession);
@@ -131,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       void loadProfile(nextSession?.user.id).catch(() => { setProfile(null); setOwnerBusiness(null); });
     });
+
     return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, [loadProfile]);
 
@@ -144,17 +170,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     signInWithGoogle: async (requestedRole = 'customer') => {
       if (!supabase) throw new Error('Supabase is not configured.');
-      // Persist the role intent in sessionStorage so the OAuth callback
-      // page can apply it even after the full browser redirect round-trip.
+      // Store intended role in sessionStorage
       try { sessionStorage.setItem(OAUTH_ROLE_INTENT_KEY, requestedRole); } catch { /* ignore */ }
+      
+      const callbackUrl = `${window.location.origin}/auth/callback`;
+      console.log(`[Google Auth] Initiating OAuth for role: ${requestedRole}, redirectTo: ${callbackUrl}`);
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
           queryParams: { access_type: 'offline', prompt: 'consent' },
         },
       });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('[Google Auth Error]:', error);
+        throw error;
+      }
     },
 
     signInWithPassword: async (email, password) => {
@@ -204,8 +237,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Context hooks intentionally share this module with their provider.
-// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error('useAuth must be used inside AuthProvider.');

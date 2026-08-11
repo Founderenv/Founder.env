@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { LoaderCircle, LockKeyhole, Store, User, AlertCircle } from 'lucide-react';
-import { useAuth, type DatabaseRole, consumeOAuthRoleIntent } from '@/auth/AuthProvider';
+import { useAuth, type DatabaseRole, consumeOAuthRoleIntent, resolvePostAuthRoute } from '@/auth/AuthProvider';
 import { Logo } from '@/components/layout/Navigation';
-import { dataMode } from '@/lib/supabase';
+import { dataMode, supabase } from '@/lib/supabase';
 
 // ============================================================
 // CUSTOMER AUTH PAGE  (/auth)
 // ============================================================
 // Entry point for customers: Sign In / Sign Up / Continue with Google.
-// This page NEVER creates a business owner account.
+// Customer login NEVER creates or accesses a business owner account.
 // ============================================================
 export function AuthPage() {
   const auth = useAuth();
@@ -22,9 +22,9 @@ export function AuthPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Already authenticated → redirect based on state
+  // Already authenticated → route using trusted post-auth resolver
   if (auth.user) {
-    return <Navigate to={getPostLoginRoute(auth.profile?.role, auth.profile?.onboardingComplete)} replace />;
+    return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
   }
   if (dataMode !== 'supabase') return <AuthUnavailable />;
 
@@ -33,14 +33,11 @@ export function AuthPage() {
     setBusy(true);
     try {
       if (signUp) {
-        // Email signup: always creates a CUSTOMER account
+        // Email signup: creates a CUSTOMER account
         await auth.signUpWithPassword(email, password, name, 'customer');
-        // After signup Supabase sends a confirmation email; profile is auto-created
-        // with role=customer, onboarding_complete=true by handle_new_user
         navigate('/');
       } else {
         await auth.signInWithPassword(email, password);
-        // onAuthStateChange will load the profile; navigate after it resolves
         navigate('/');
       }
     } catch (caught) {
@@ -54,20 +51,23 @@ export function AuthPage() {
     <div className="mx-auto max-w-md py-8">
       <div className="card p-6">
         <Logo />
-        <h1 className="mt-6 text-2xl font-bold">{signUp ? 'Create account' : 'Welcome back'}</h1>
+        <h1 className="mt-6 text-2xl font-bold">{signUp ? 'Create customer account' : 'Welcome back'}</h1>
         <p className="mt-1 text-sm text-gray-500">
           {signUp ? 'Join as a customer. Discover local deals and earn rewards.' : 'Sign in to your customer account.'}
         </p>
 
-        {/* Google OAuth — always creates/signs in a CUSTOMER */}
+        {/* Google OAuth — customer role intent */}
         <button
+          type="button"
           id="auth-google-customer"
-          onClick={() =>
-            auth.signInWithGoogle('customer').catch((caught) =>
-              setError(caught instanceof Error ? caught.message : 'Google sign-in failed')
-            )
-          }
-          className="btn-outline mt-5 w-full"
+          onClick={() => {
+            setError('');
+            auth.signInWithGoogle('customer').catch((caught) => {
+              const msg = caught instanceof Error ? caught.message : 'Google sign-in failed';
+              setError(msg);
+            });
+          }}
+          className="btn-outline mt-5 w-full flex items-center justify-center gap-2"
         >
           <GoogleIcon />
           Continue with Google
@@ -79,7 +79,7 @@ export function AuthPage() {
           <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
         </div>
 
-        <div className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-3">
           {signUp && (
             <input
               id="auth-name"
@@ -105,39 +105,37 @@ export function AuthPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </div>
 
-        {error && (
-          <p className="mt-3 flex items-center gap-2 rounded-xl bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10">
-            <AlertCircle size={16} className="shrink-0" />
-            {error}
-          </p>
-        )}
+          {error && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <button
-          id="auth-submit"
-          onClick={() => void submit()}
-          disabled={!email || !password || (signUp && !name) || busy}
-          className="btn-primary mt-4 w-full"
-        >
-          {busy ? <LoaderCircle size={16} className="animate-spin" /> : <LockKeyhole size={16} />}
-          {signUp ? 'Create customer account' : 'Sign in'}
-        </button>
+          <button
+            type="submit"
+            id="auth-submit"
+            disabled={!email || !password || (signUp && !name) || busy}
+            className="btn-primary mt-4 w-full"
+          >
+            {busy ? <LoaderCircle size={16} className="animate-spin" /> : <LockKeyhole size={16} />}
+            {signUp ? 'Create customer account' : 'Sign in'}
+          </button>
+        </form>
 
-        <button onClick={() => setSignUp((v) => !v)} className="btn-ghost mt-2 w-full">
+        <button type="button" onClick={() => { setError(''); setSignUp((v) => !v); }} className="btn-ghost mt-2 w-full">
           {signUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
         </button>
 
         <div className="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
           <p className="text-center text-xs text-gray-400">
             Are you a business owner?{' '}
-            <a href="/auth/business" className="text-brand-600 hover:underline">
+            <a href="/auth/business" className="text-brand-600 font-medium hover:underline">
               List your business →
             </a>
           </p>
         </div>
-
-        <p className="mt-3 text-center text-xs text-gray-400">Admin access cannot be self-selected.</p>
       </div>
     </div>
   );
@@ -147,7 +145,7 @@ export function AuthPage() {
 // BUSINESS OWNER AUTH PAGE  (/auth/business)
 // ============================================================
 // Dedicated entry point for business owners.
-// Google OAuth from this page stores 'business_owner' intent.
+// Password login verifies profile.role === 'business_owner' before allowing entry.
 // ============================================================
 export function BusinessAuthPage() {
   const auth = useAuth();
@@ -159,9 +157,31 @@ export function BusinessAuthPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Already authenticated
+  // Already authenticated → route using trusted post-auth resolver
   if (auth.user) {
-    return <Navigate to={getPostLoginRoute(auth.profile?.role, auth.profile?.onboardingComplete)} replace />;
+    // If authenticated user is a customer trying to open /auth/business, redirect home
+    if (auth.profile?.role === 'customer') {
+      return (
+        <div className="mx-auto max-w-md py-12 text-center">
+          <div className="card p-6">
+            <AlertCircle className="mx-auto text-amber-500" size={32} />
+            <h2 className="mt-4 text-lg font-bold">Customer Account Logged In</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              You are currently signed in as a customer ({auth.user.email}). To access the Business Owner Portal, please sign out first.
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <button onClick={() => void auth.signOut()} className="btn-outline">
+                Sign out
+              </button>
+              <button onClick={() => navigate('/')} className="btn-primary">
+                Go to Customer Feed
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
   }
   if (dataMode !== 'supabase') return <AuthUnavailable />;
 
@@ -172,11 +192,32 @@ export function BusinessAuthPage() {
       if (signUp) {
         // Email signup with business_owner intent
         await auth.signUpWithPassword(email, password, name, 'business_owner');
-        // handle_new_user creates role=business_owner, onboarding_complete=false
         navigate('/onboarding');
       } else {
+        // Email/Password sign in for business owner
         await auth.signInWithPassword(email, password);
-        navigate('/');
+        
+        // Fetch freshly authenticated profile from database to verify role
+        const client = supabase;
+        if (client) {
+          const { data: sessionData } = await client.auth.getSession();
+          const userId = sessionData.session?.user.id;
+          if (userId) {
+            const { data: profileRow } = await client.from('profiles').select('role').eq('id', userId).maybeSingle();
+            const userRole = profileRow?.role;
+            
+            if (userRole && userRole !== 'business_owner' && userRole !== 'admin') {
+              // Account is a customer account! Show clear error and do NOT allow owner access
+              await auth.signOut();
+              setError('This account is a customer account. Please use Customer Sign In or create a Business Owner account.');
+              setBusy(false);
+              return;
+            }
+          }
+        }
+        
+        await auth.refreshProfile();
+        navigate(resolvePostAuthRoute(auth.profile, auth.ownerBusiness));
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Authentication failed');
@@ -204,15 +245,18 @@ export function BusinessAuthPage() {
             : 'Sign in to your business owner account.'}
         </p>
 
-        {/* Google OAuth — stores 'business_owner' intent for the callback */}
+        {/* Google OAuth — stores 'business_owner' intent for callback */}
         <button
+          type="button"
           id="auth-google-business"
-          onClick={() =>
-            auth.signInWithGoogle('business_owner').catch((caught) =>
-              setError(caught instanceof Error ? caught.message : 'Google sign-in failed')
-            )
-          }
-          className="btn-outline mt-5 w-full"
+          onClick={() => {
+            setError('');
+            auth.signInWithGoogle('business_owner').catch((caught) => {
+              const msg = caught instanceof Error ? caught.message : 'Google sign-in failed';
+              setError(msg);
+            });
+          }}
+          className="btn-outline mt-5 w-full flex items-center justify-center gap-2"
         >
           <GoogleIcon />
           Continue as Business Owner with Google
@@ -224,7 +268,7 @@ export function BusinessAuthPage() {
           <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
         </div>
 
-        <div className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-3">
           {signUp && (
             <input
               id="biz-auth-name"
@@ -250,33 +294,33 @@ export function BusinessAuthPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </div>
 
-        {error && (
-          <p className="mt-3 flex items-center gap-2 rounded-xl bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10">
-            <AlertCircle size={16} className="shrink-0" />
-            {error}
-          </p>
-        )}
+          {error && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
 
-        <button
-          id="biz-auth-submit"
-          onClick={() => void submit()}
-          disabled={!email || !password || (signUp && !name) || busy}
-          className="btn-primary mt-4 w-full"
-        >
-          {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Store size={16} />}
-          {signUp ? 'Create business account' : 'Sign in as owner'}
-        </button>
+          <button
+            type="submit"
+            id="biz-auth-submit"
+            disabled={!email || !password || (signUp && !name) || busy}
+            className="btn-primary mt-4 w-full"
+          >
+            {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Store size={16} />}
+            {signUp ? 'Create business account' : 'Sign in as owner'}
+          </button>
+        </form>
 
-        <button onClick={() => setSignUp((v) => !v)} className="btn-ghost mt-2 w-full">
+        <button type="button" onClick={() => { setError(''); setSignUp((v) => !v); }} className="btn-ghost mt-2 w-full">
           {signUp ? 'Already have a business account? Sign in' : 'New here? List your business'}
         </button>
 
         <div className="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
           <p className="text-center text-xs text-gray-400">
             Looking for your customer account?{' '}
-            <a href="/auth" className="text-brand-600 hover:underline">
+            <a href="/auth" className="text-brand-600 font-medium hover:underline">
               Customer sign in →
             </a>
           </p>
@@ -289,64 +333,100 @@ export function BusinessAuthPage() {
 // ============================================================
 // AUTH CALLBACK PAGE  (/auth/callback)
 // ============================================================
-// Handles the Google OAuth redirect. Reads the role intent that
-// was stored in sessionStorage before the OAuth redirect and
-// applies it to the profile if it has not been set yet.
+// Handles the OAuth redirect. Parses URL error parameters if Google OAuth
+// fails, waits for session resolution, consumes role intent, and routes
+// safely using resolvePostAuthRoute.
 // ============================================================
 export function AuthCallbackPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const [applying, setApplying] = useState(false);
-  const [error, setError] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (auth.loading || applying) return;
-    if (!auth.user) return; // still loading or error — handled below
+    // Check for error parameters in query string or hash fragment (from Supabase/Google)
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash);
+    
+    const err = searchParams.get('error_description') || searchParams.get('error') || hashParams.get('error_description') || hashParams.get('error');
+    if (err) {
+      console.error('[OAuth Callback URL Error]:', err);
+      setUrlError(decodeURIComponent(err).replace(/\+/g, ' '));
+      return;
+    }
 
-    const applyIntent = async () => {
+    if (auth.loading || applying) return;
+
+    const processCallback = async () => {
       setApplying(true);
       try {
-        // Read the stored role intent (one-time, clears itself)
-        const intent = consumeOAuthRoleIntent();
-
-        if (!auth.profile?.onboardingComplete && intent) {
-          // New Google user with a role intent — apply it
-          await auth.chooseRole(intent);
-          // After chooseRole, profile is refreshed
-          // business_owner → onboarding_complete=false → redirect /onboarding
-          // customer → onboarding_complete=true → redirect /
-        } else if (!auth.profile?.onboardingComplete && !intent) {
-          // New Google user, no stored intent → treat as customer
-          await auth.chooseRole('customer');
+        if (!auth.user) {
+          // If auth loading finished but user is still null, wait brief moment for session restore
+          if (supabase) {
+            const { data } = await supabase.auth.getSession();
+            if (!data.session?.user) {
+              setUrlError('Authentication session could not be established. Please verify Google OAuth configuration in Supabase Dashboard.');
+              setApplying(false);
+              return;
+            }
+          }
         }
 
-        // Now route based on the updated profile state
-        const updatedRole = auth.profile?.role;
-        const updatedComplete = auth.profile?.onboardingComplete;
-        navigate(getPostLoginRoute(updatedRole, updatedComplete), { replace: true });
+        // Consume stored role intent from sessionStorage
+        const intent = consumeOAuthRoleIntent();
+
+        if (!auth.profile?.onboardingComplete) {
+          if (intent) {
+            await auth.chooseRole(intent);
+          } else {
+            // Default new OAuth user to customer if no stored intent
+            await auth.chooseRole('customer');
+          }
+        }
+
+        await auth.refreshProfile();
+        // Route to trusted destination
+        const dest = resolvePostAuthRoute(auth.profile, auth.ownerBusiness);
+        navigate(dest, { replace: true });
       } catch (caught) {
-        setError(caught instanceof Error ? caught.message : 'Sign-in failed');
+        console.error('[OAuth Callback Resolution Error]:', caught);
+        setUrlError(caught instanceof Error ? caught.message : 'OAuth callback resolution failed');
         setApplying(false);
       }
     };
 
-    void applyIntent();
+    void processCallback();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.loading, auth.user]);
 
-  if (error) {
+  if (urlError) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <AlertCircle className="text-error-500" size={32} />
-        <h1 className="text-xl font-bold">Sign-in error</h1>
-        <p className="text-sm text-gray-500">{error}</p>
-        <a href="/auth" className="btn-primary">Try again</a>
+      <div className="mx-auto max-w-md py-16 px-4 text-center">
+        <div className="card p-6">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-error-50 text-error-600 dark:bg-error-500/10">
+            <AlertCircle size={28} />
+          </div>
+          <h1 className="mt-4 text-xl font-bold text-gray-900 dark:text-white">Authentication Failed</h1>
+          <p className="mt-2 text-sm text-gray-500 break-words">{urlError}</p>
+
+          {urlError.includes('provider') || urlError.includes('configuration') ? (
+            <div className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-800 text-left dark:bg-amber-500/10 dark:text-amber-300">
+              <p className="font-semibold">Setup Requirement Notice:</p>
+              <p className="mt-1">Google OAuth Provider must be enabled in your Supabase Dashboard under Authentication -&gt; Providers -&gt; Google.</p>
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <a href="/auth" className="btn-primary">
+              Customer Sign In
+            </a>
+            <a href="/auth/business" className="btn-outline">
+              Business Owner Sign In
+            </a>
+          </div>
+        </div>
       </div>
     );
-  }
-
-  if (!auth.user && !auth.loading) {
-    return <Navigate to="/auth" replace />;
   }
 
   return <CenteredLoading label="Completing secure sign-in…" />;
@@ -355,18 +435,15 @@ export function AuthCallbackPage() {
 // ============================================================
 // CHOOSE ROLE PAGE  (/choose-role)
 // ============================================================
-// Shown to users who are authenticated but have not yet set their
-// role (onboarding_complete = false). Typically Google OAuth users
-// who didn't have a stored intent (edge case fallback).
-// ============================================================
 export function ChooseRolePage() {
   const auth = useAuth();
+  const navigate = useNavigate();
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   if (!auth.user) return <Navigate to="/auth" replace />;
   if (auth.profile?.onboardingComplete) {
-    return <Navigate to={getPostLoginRoute(auth.profile.role, true)} replace />;
+    return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
   }
 
   const choose = async (role: 'customer' | 'business_owner') => {
@@ -374,9 +451,8 @@ export function ChooseRolePage() {
     setError('');
     try {
       await auth.chooseRole(role);
-      // After choosing, profile is reloaded. Navigate based on outcome.
-      // business_owner: onboarding_complete=false → /onboarding
-      // customer: onboarding_complete=true → /
+      await auth.refreshProfile();
+      navigate(resolvePostAuthRoute(auth.profile, auth.ownerBusiness));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save role');
       setSaving(false);
@@ -423,22 +499,6 @@ export function ChooseRolePage() {
 // ============================================================
 // Helpers
 // ============================================================
-
-/**
- * Determines where to send a user after a successful login,
- * based on their role and onboarding completion state.
- */
-export function getPostLoginRoute(role?: DatabaseRole, onboardingComplete?: boolean): string {
-  if (!role) return '/choose-role';
-  if (role === 'admin') return '/admin';
-  if (role === 'business_owner') {
-    if (!onboardingComplete) return '/onboarding';
-    // onboardingComplete=true means the wizard was done; payment gate is checked in App.tsx
-    return '/owner/analytics';
-  }
-  // customer (or unknown)
-  return '/';
-}
 
 function AuthUnavailable() {
   return (
