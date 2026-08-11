@@ -32,7 +32,16 @@ export function AppShell({ children, showNav = true, maxWidth = 'feed' }: AppShe
       <div className="min-h-screen bg-white dark:bg-gray-950">
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
           <ThemeToggle theme={theme} setTheme={setTheme} />
-          {isBackendMode ? <Link to="/auth" className="btn-primary">Sign in</Link> : <DevPreviewSwitcher role={role} setRole={setRole} />}
+          {isBackendMode ? (
+            <div className="flex items-center gap-2">
+              <Link to="/auth/business" className="btn-outline text-sm">
+                List Business
+              </Link>
+              <Link to="/auth" className="btn-primary text-sm">Sign in</Link>
+            </div>
+          ) : (
+            <DevPreviewSwitcher role={role} setRole={setRole} />
+          )}
         </div>
         {children}
       </div>

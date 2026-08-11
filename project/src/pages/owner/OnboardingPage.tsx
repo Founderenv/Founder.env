@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, CreditCard, Image as ImageIcon, MapPin, Store, Loader2 } from 'lucide-react';
 import { businessService, categoryService, templateService } from '@/services';
 import { dataMode } from '@/lib/supabase';
+import { useAuth } from '@/auth/AuthProvider';
 import type { BusinessTemplateConfig, Category, TemplateId } from '@/types';
 import { cn } from '@/utils/format';
 
@@ -23,6 +24,7 @@ interface Draft {
 
 export function OnboardingPage() {
   const navigate = useNavigate();
+  const { completeBusinessOnboarding } = useAuth();
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [templates, setTemplates] = useState<BusinessTemplateConfig[]>([]);
@@ -101,11 +103,18 @@ export function OnboardingPage() {
           cover: coverFile || undefined,
         }
       );
+      // Mark onboarding as complete in the database now that the business
+      // record exists. This sets profile.onboarding_complete = true and
+      // allows the owner to access the payment pending page.
+      if (dataMode === 'supabase') {
+        await completeBusinessOnboarding();
+      }
       setStatusMessage({
         type: 'success',
-        text: 'Business created successfully in pending activation state! Redirecting...',
+        text: 'Business profile saved! Setting up payment…',
       });
-      setTimeout(() => navigate('/owner'), 1500);
+      // Route to payment pending page (payment gate will show ₹599 placeholder)
+      setTimeout(() => navigate('/owner/payment-pending'), 1500);
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: (err as Error).message || 'Failed to save business profile.' });
     } finally {

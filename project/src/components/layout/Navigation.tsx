@@ -20,7 +20,7 @@ const customerNav: NavItem[] = [
 ];
 
 const ownerNav: NavItem[] = [
-  { to: '/business/cafearoma', label: 'Profile', icon: Home },
+  { to: '/owner/analytics', label: 'Home', icon: Home },
   { to: '/owner/create', label: 'Create', icon: Plus },
   { to: '/messages', label: 'Messages', icon: MessageCircle },
   { to: '/owner/analytics', label: 'Analytics', icon: BarChart3 },

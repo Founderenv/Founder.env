@@ -19,8 +19,8 @@ export function LandingPage() {
             Create your digital business presence, grow your customer community and promote your business through one smart QR.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link to="/onboarding" className="btn-primary text-base px-8 py-3.5">
-              <Store size={20} /> Create Business Profile
+            <Link to="/auth/business" className="btn-primary text-base px-8 py-3.5">
+              <Store size={20} /> List Your Business
             </Link>
             <Link to="/explore" className="btn-outline text-base px-8 py-3.5">
               Explore Businesses <ArrowRight size={18} />
@@ -162,8 +162,8 @@ export function LandingPage() {
         <div className="max-w-2xl mx-auto text-center text-white">
           <h2 className="font-display text-3xl font-bold">Your shop deserves followers too.</h2>
           <p className="mt-3 text-white/80">Start building your customer community today.</p>
-          <Link to="/onboarding" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-brand-700 hover:bg-brand-50 active:scale-[0.98]">
-            <Store size={20} /> Create Business Profile
+          <Link to="/auth/business" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-8 py-3.5 text-base font-semibold text-brand-700 hover:bg-brand-50 active:scale-[0.98]">
+            <Store size={20} /> List Your Business
           </Link>
         </div>
       </section>
