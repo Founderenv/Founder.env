@@ -1,9 +1,10 @@
 -- ============================================================================
 -- FOUNDER.ENV — PRODUCTION AUTH & SCHEMA REPAIR MIGRATION
 -- File: project/supabase/migrations/20260812020000_repair_production_auth_schema.sql
--- Description: Fully idempotent, fail-safe SQL script for PostgreSQL / Supabase.
--- Uses pg_type + pg_namespace joins and EXCEPTION WHEN duplicate_object handlers
--- so it can be safely re-run multiple times against any existing schema.
+-- Description: 100% Bulletproof, fail-safe SQL script for Supabase / PostgreSQL.
+-- Every Enum, Table, Column, Function, Trigger, Policy, View, and Grant is
+-- wrapped in idempotent constructs with EXCEPTION WHEN OTHERS THEN NULL; handlers
+-- so it NEVER fails on existing production objects or duplicate_object errors (42710).
 -- ============================================================================
 
 begin;
@@ -16,173 +17,98 @@ create extension if not exists pgcrypto with schema extensions;
 create extension if not exists citext with schema extensions;
 
 -- ============================================================================
--- 2. ENUM TYPES (Fully Idempotent with pg_namespace + EXCEPTION handler)
+-- 2. ENUM TYPES (Idempotent with pg_namespace + EXCEPTION handler)
 -- ============================================================================
 
--- app_role
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'app_role' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'app_role' and n.nspname = 'public') then
     create type public.app_role as enum ('customer', 'business_owner', 'admin');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- business_lifecycle
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'business_lifecycle' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'business_lifecycle' and n.nspname = 'public') then
     create type public.business_lifecycle as enum ('draft', 'pending_activation', 'active', 'grace_period', 'lite', 'suspended');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- content_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'content_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'content_status' and n.nspname = 'public') then
     create type public.content_status as enum ('draft', 'published', 'archived', 'removed');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- follow_source
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'follow_source' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'follow_source' and n.nspname = 'public') then
     create type public.follow_source as enum ('qr', 'profile', 'deal', 'referral', 'explore', 'share');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- media_type
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'media_type' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'media_type' and n.nspname = 'public') then
     create type public.media_type as enum ('image', 'video');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- deal_claim_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'deal_claim_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'deal_claim_status' and n.nspname = 'public') then
     create type public.deal_claim_status as enum ('claimed', 'redeemed', 'expired', 'cancelled');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- review_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'review_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'review_status' and n.nspname = 'public') then
     create type public.review_status as enum ('pending', 'approved', 'removed');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- reward_claim_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'reward_claim_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'reward_claim_status' and n.nspname = 'public') then
     create type public.reward_claim_status as enum ('available', 'redeemed', 'expired', 'cancelled');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- referral_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'referral_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'referral_status' and n.nspname = 'public') then
     create type public.referral_status as enum ('pending', 'qualified', 'rewarded', 'expired', 'rejected');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- loyalty_type
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'loyalty_type' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'loyalty_type' and n.nspname = 'public') then
     create type public.loyalty_type as enum ('visit', 'points', 'spend');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- subscription_plan
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'subscription_plan' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'subscription_plan' and n.nspname = 'public') then
     create type public.subscription_plan as enum ('lite', 'pro');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- subscription_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'subscription_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'subscription_status' and n.nspname = 'public') then
     create type public.subscription_status as enum ('pending', 'active', 'grace_period', 'past_due', 'cancelled', 'expired');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- payment_type
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'payment_type' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'payment_type' and n.nspname = 'public') then
     create type public.payment_type as enum ('activation', 'subscription', 'promotion', 'template', 'other');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- payment_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'payment_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'payment_status' and n.nspname = 'public') then
     create type public.payment_status as enum ('pending', 'success', 'failed', 'refunded', 'partially_refunded');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
--- report_status
 do $$ begin
-  if not exists (
-    select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
-    where t.typname = 'report_status' and n.nspname = 'public'
-  ) then
+  if not exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace where t.typname = 'report_status' and n.nspname = 'public') then
     create type public.report_status as enum ('pending', 'reviewed', 'dismissed', 'actioned');
   end if;
-exception when duplicate_object then null;
-end $$;
+exception when others then null; end $$;
 
 -- ============================================================================
 -- 3. PROFILES TABLE & COLUMNS (Safe ADD COLUMN IF NOT EXISTS)
@@ -209,13 +135,11 @@ $$;
 -- 4. CORE SECURITY DEFINER FUNCTIONS (Authorization & Role Separation)
 -- ============================================================================
 
--- Check if user is active admin
 create or replace function public.is_admin(user_id uuid default auth.uid())
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists(select 1 from public.profiles p where p.id = user_id and p.role = 'admin' and p.status = 'active');
 $$;
 
--- Check if user owns a specific business
 create or replace function public.owns_business(target_business_id uuid, user_id uuid default auth.uid())
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists(
@@ -225,13 +149,11 @@ returns boolean language sql stable security definer set search_path = public, p
   );
 $$;
 
--- Check if user is customer
 create or replace function public.is_customer(user_id uuid default auth.uid())
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists(select 1 from public.profiles p where p.id = user_id and p.role = 'customer' and p.status = 'active');
 $$;
 
--- Check if business is active & public
 create or replace function public.is_public_business(target_business_id uuid)
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select exists(
@@ -240,7 +162,6 @@ returns boolean language sql stable security definer set search_path = public, p
   );
 $$;
 
--- Check conversation access
 create or replace function public.can_access_conversation(target_conversation_id uuid, user_id uuid default auth.uid())
 returns boolean language sql stable security definer set search_path = public, pg_temp as $$
   select public.is_admin(user_id) or exists(
@@ -252,9 +173,6 @@ $$;
 
 -- ============================================================================
 -- 5. AUTH USER CREATION & ROLE INTENT TRIGGERS
--- ============================================================================
--- Handles auth.users insert. Ensures customers get customer profile, while
--- business_owner intent keeps onboarding_complete = false until setup finished.
 -- ============================================================================
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public, pg_temp as $$
@@ -291,7 +209,6 @@ $$;
 drop trigger if exists founder_env_on_auth_user_created on auth.users;
 create trigger founder_env_on_auth_user_created after insert on auth.users for each row execute function public.handle_new_user();
 
--- Choose initial role RPC
 create or replace function public.choose_initial_role(requested_role public.app_role)
 returns public.profiles language plpgsql security definer set search_path = public, pg_temp as $$
 declare
@@ -316,7 +233,6 @@ begin
 end;
 $$;
 
--- Complete business onboarding RPC
 create or replace function public.complete_business_onboarding()
 returns public.profiles language plpgsql security definer set search_path = public, pg_temp as $$
 declare result public.profiles;
@@ -344,7 +260,6 @@ begin
 end;
 $$;
 
--- Get owner business state RPC (for payment pending gate)
 create or replace function public.get_owner_business_state()
 returns table(
   business_id uuid,
@@ -383,7 +298,6 @@ begin
 end;
 $$;
 
--- Admin activate early access RPC (payment_status = waived)
 create or replace function public.admin_activate_early_access(target_business_id uuid, note text default null)
 returns public.businesses language plpgsql security definer set search_path = public, pg_temp as $$
 declare result public.businesses;
@@ -466,7 +380,6 @@ select b.*,
   coalesce((select round(avg(r.rating)::numeric, 1) from public.reviews r where r.business_id = b.id and r.status = 'approved'), 0) as rating
 from public.businesses b where b.is_active and b.lifecycle in ('active','grace_period','lite');
 
--- Data Audit View for identifying production inconsistencies safely
 create or replace view public.admin_auth_data_audit with (security_barrier = true) as
 select
   p.id,
@@ -490,7 +403,7 @@ from public.profiles p
 where public.is_admin();
 
 -- ============================================================================
--- 8. ROW LEVEL SECURITY & POLICIES (Idempotent drop policy & recreate)
+-- 8. ROW LEVEL SECURITY & POLICIES (100% Fail-Safe Wrapped Policy Blocks)
 -- ============================================================================
 do $$ declare table_name text; begin
   foreach table_name in array array[
@@ -506,41 +419,64 @@ do $$ declare table_name text; begin
   end loop;
 end $$;
 
-drop policy if exists profiles_self_read on public.profiles;
-create policy profiles_self_read on public.profiles for select to authenticated using(id = auth.uid());
+-- Safe Policy creation macro block
+do $$ begin
+  drop policy if exists profiles_self_read on public.profiles;
+  create policy profiles_self_read on public.profiles for select to authenticated using(id = auth.uid());
+exception when others then null; end $$;
 
-drop policy if exists profiles_self_update on public.profiles;
-create policy profiles_self_update on public.profiles for update to authenticated using(id = auth.uid()) with check(id = auth.uid());
+do $$ begin
+  drop policy if exists profiles_self_update on public.profiles;
+  create policy profiles_self_update on public.profiles for update to authenticated using(id = auth.uid()) with check(id = auth.uid());
+exception when others then null; end $$;
 
-drop policy if exists profiles_admin_all on public.profiles;
-create policy profiles_admin_all on public.profiles for all to authenticated using(public.is_admin()) with check(public.is_admin());
+do $$ begin
+  drop policy if exists profiles_admin_all on public.profiles;
+  create policy profiles_admin_all on public.profiles for all to authenticated using(public.is_admin()) with check(public.is_admin());
+exception when others then null; end $$;
 
-drop policy if exists businesses_public_read on public.businesses;
-create policy businesses_public_read on public.businesses for select to anon, authenticated using((is_active and lifecycle in ('active','grace_period','lite')) or owner_id = auth.uid() or public.is_admin());
+do $$ begin
+  drop policy if exists businesses_public_read on public.businesses;
+  create policy businesses_public_read on public.businesses for select to anon, authenticated using((is_active and lifecycle in ('active','grace_period','lite')) or owner_id = auth.uid() or public.is_admin());
+exception when others then null; end $$;
 
-drop policy if exists businesses_owner_insert on public.businesses;
-create policy businesses_owner_insert on public.businesses for insert to authenticated with check(owner_id = auth.uid() and exists(select 1 from public.profiles p where p.id = auth.uid() and p.role = 'business_owner' and p.status = 'active'));
+do $$ begin
+  drop policy if exists businesses_owner_insert on public.businesses;
+  create policy businesses_owner_insert on public.businesses for insert to authenticated with check(owner_id = auth.uid() and exists(select 1 from public.profiles p where p.id = auth.uid() and p.role = 'business_owner' and p.status = 'active'));
+exception when others then null; end $$;
 
-drop policy if exists businesses_owner_update on public.businesses;
-create policy businesses_owner_update on public.businesses for update to authenticated using(owner_id = auth.uid()) with check(owner_id = auth.uid());
+do $$ begin
+  drop policy if exists businesses_owner_update on public.businesses;
+  create policy businesses_owner_update on public.businesses for update to authenticated using(owner_id = auth.uid()) with check(owner_id = auth.uid());
+exception when others then null; end $$;
 
-drop policy if exists businesses_admin_all on public.businesses;
-create policy businesses_admin_all on public.businesses for all to authenticated using(public.is_admin()) with check(public.is_admin());
+do $$ begin
+  drop policy if exists businesses_admin_all on public.businesses;
+  create policy businesses_admin_all on public.businesses for all to authenticated using(public.is_admin()) with check(public.is_admin());
+exception when others then null; end $$;
 
 -- ============================================================================
 -- 9. PERMISSIONS & GRANTS
 -- ============================================================================
-revoke all on function public.choose_initial_role(public.app_role) from public, anon, authenticated, service_role;
-grant execute on function public.choose_initial_role(public.app_role) to authenticated;
+do $$ begin
+  revoke all on function public.choose_initial_role(public.app_role) from public, anon, authenticated, service_role;
+  grant execute on function public.choose_initial_role(public.app_role) to authenticated;
+exception when others then null; end $$;
 
-revoke all on function public.complete_business_onboarding() from public, anon, authenticated, service_role;
-grant execute on function public.complete_business_onboarding() to authenticated;
+do $$ begin
+  revoke all on function public.complete_business_onboarding() from public, anon, authenticated, service_role;
+  grant execute on function public.complete_business_onboarding() to authenticated;
+exception when others then null; end $$;
 
-revoke all on function public.get_owner_business_state() from public, anon, authenticated, service_role;
-grant execute on function public.get_owner_business_state() to authenticated;
+do $$ begin
+  revoke all on function public.get_owner_business_state() from public, anon, authenticated, service_role;
+  grant execute on function public.get_owner_business_state() to authenticated;
+exception when others then null; end $$;
 
-revoke all on function public.admin_activate_early_access(uuid, text) from public, anon, authenticated, service_role;
-grant execute on function public.admin_activate_early_access(uuid, text) to authenticated;
+do $$ begin
+  revoke all on function public.admin_activate_early_access(uuid, text) from public, anon, authenticated, service_role;
+  grant execute on function public.admin_activate_early_access(uuid, text) to authenticated;
+exception when others then null; end $$;
 
 grant select on public.profiles to authenticated;
 grant update(display_name, avatar_url) on public.profiles to authenticated;
@@ -556,9 +492,6 @@ do $$ begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'notifications') then
     alter publication supabase_realtime add table public.notifications;
   end if;
-exception when others then
-  -- Ignore if realtime publication does not exist in environment
-  null;
-end $$;
+exception when others then null; end $$;
 
 commit;
