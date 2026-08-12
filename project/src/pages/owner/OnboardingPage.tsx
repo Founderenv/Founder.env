@@ -104,17 +104,15 @@ export function OnboardingPage() {
         }
       );
       // Mark onboarding as complete in the database now that the business
-      // record exists. This sets profile.onboarding_complete = true and
-      // allows the owner to access the payment pending page.
+      // record exists. This sets profile.onboarding_complete = true.
       if (dataMode === 'supabase') {
         await completeBusinessOnboarding();
       }
       setStatusMessage({
         type: 'success',
-        text: 'Business profile saved! Setting up payment…',
+        text: 'Business profile saved! Opening your dashboard…',
       });
-      // Route to payment pending page (payment gate will show ₹599 placeholder)
-      setTimeout(() => navigate('/owner/payment-pending'), 1500);
+      setTimeout(() => navigate('/business/dashboard'), 1500);
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: (err as Error).message || 'Failed to save business profile.' });
     } finally {

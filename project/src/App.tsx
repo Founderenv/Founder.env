@@ -110,19 +110,20 @@ function AuthGate({
 
   // Not authenticated → send to appropriate login
   if (!user) {
-    const isOwnerRoute = location.pathname.startsWith('/owner') || location.pathname === '/onboarding';
+    const isOwnerRoute = location.pathname.startsWith('/owner') || location.pathname === '/onboarding' || location.pathname.startsWith('/business/dashboard') || location.pathname.startsWith('/business/onboarding');
     return <Navigate to={isOwnerRoute ? '/auth/business' : '/auth'} replace />;
   }
 
   // Authenticated but role not yet chosen → choose-role
-  if (!profile?.onboardingComplete && !location.pathname.startsWith('/onboarding')) {
-    return <Navigate to="/choose-role" replace />;
+  if (!profile) return <PageSkeleton />;
+  if (!profile.onboardingComplete && !location.pathname.startsWith('/onboarding') && !location.pathname.startsWith('/business/onboarding')) {
+    return <Navigate to={profile.role === 'business_owner' ? '/business/onboarding' : '/choose-role'} replace />;
   }
 
   // Role check
   if (roles && profile?.role && !roles.includes(profile.role)) {
     // customer trying to access owner route → redirect home (not auto-create business)
-    return <Navigate to="/" replace />;
+    return <Navigate to={profile.role === 'customer' ? '/customer' : '/business/dashboard'} replace />;
   }
 
   // Payment gate — only for business_owner routes that require activation
@@ -149,12 +150,13 @@ function OwnerOnboardingGate({ children }: { children: ReactNode }) {
   if (!user) return <Navigate to="/auth/business" replace />;
 
   // Only business owners should reach onboarding
-  if (profile?.role === 'customer') return <Navigate to="/" replace />;
+  if (!profile) return <PageSkeleton />;
+  if (profile.role === 'customer') return <Navigate to="/customer" replace />;
   if (profile?.role === 'admin') return <Navigate to="/admin" replace />;
 
   // If already fully activated, redirect to dashboard
-  if (profile?.onboardingComplete && ownerBusiness?.paymentGate === 'paid') {
-    return <Navigate to="/owner/analytics" replace />;
+  if (profile.onboardingComplete && ownerBusiness) {
+    return <Navigate to="/business/dashboard" replace />;
   }
 
   return children;
@@ -196,6 +198,7 @@ function RoutedApp() {
 
           {/* Auth — customer entry */}
           <Route path="/auth" element={<AuthPage />} />
+          <Route path="/auth/customer" element={<AuthPage />} />
           {/* Auth — business owner entry */}
           <Route path="/auth/business" element={<BusinessAuthPage />} />
           {/* OAuth callback — handles both customer + business Google OAuth */}
@@ -266,6 +269,7 @@ function RoutedApp() {
               </OwnerOnboardingGate>
             }
           />
+          <Route path="/business/onboarding" element={<OwnerOnboardingGate><OnboardingPage /></OwnerOnboardingGate>} />
 
           {/* Business owner — payment pending placeholder */}
           <Route

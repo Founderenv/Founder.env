@@ -20,10 +20,12 @@ export function AuthPage() {
   const [name, setName] = useState('');
   const [signUp, setSignUp] = useState(searchParams.get('mode') === 'signup');
   const [error, setError] = useState('');
+  const [confirmationRequired, setConfirmationRequired] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Already authenticated → route using trusted post-auth resolver
-  if (auth.user) {
+  if (auth.loading) return <CenteredLoading label="Restoring your session…" />;
+  if (auth.user && auth.profile) {
     return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
   }
   if (dataMode !== 'supabase') return <AuthUnavailable />;
@@ -34,14 +36,15 @@ export function AuthPage() {
     try {
       if (signUp) {
         // Email signup: creates a CUSTOMER account
-        await auth.signUpWithPassword(email, password, name, 'customer');
-        navigate('/');
+        const completion = await auth.signUpWithPassword(email, password, name, 'customer');
+        if (completion.emailConfirmationRequired) { setConfirmationRequired(true); return; }
+        navigate(completion.destination ?? '/customer', { replace: true });
       } else {
-        await auth.signInWithPassword(email, password);
-        navigate('/');
+        const completion = await auth.signInWithPassword(email, password);
+        navigate(completion.destination ?? '/customer', { replace: true });
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Authentication failed');
+      setError(authErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -50,6 +53,7 @@ export function AuthPage() {
   return (
     <div className="mx-auto max-w-md py-8">
       <div className="card p-6">
+        {confirmationRequired ? <EmailConfirmation email={email} signInPath="/auth" /> : <>
         <Logo />
         <h1 className="mt-6 text-2xl font-bold">{signUp ? 'Create customer account' : 'Welcome back'}</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -136,6 +140,7 @@ export function AuthPage() {
             </a>
           </p>
         </div>
+        </>}
       </div>
     </div>
   );
@@ -155,10 +160,12 @@ export function BusinessAuthPage() {
   const [name, setName] = useState('');
   const [signUp, setSignUp] = useState(false);
   const [error, setError] = useState('');
+  const [confirmationRequired, setConfirmationRequired] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Already authenticated → route using trusted post-auth resolver
-  if (auth.user) {
+  if (auth.loading) return <CenteredLoading label="Restoring your session…" />;
+  if (auth.user && auth.profile) {
     // If authenticated user is a customer trying to open /auth/business, redirect home
     if (auth.profile?.role === 'customer') {
       return (
@@ -191,36 +198,20 @@ export function BusinessAuthPage() {
     try {
       if (signUp) {
         // Email signup with business_owner intent
-        await auth.signUpWithPassword(email, password, name, 'business_owner');
-        navigate('/onboarding');
+        const completion = await auth.signUpWithPassword(email, password, name, 'business_owner');
+        if (completion.emailConfirmationRequired) { setConfirmationRequired(true); return; }
+        navigate(completion.destination ?? '/business/onboarding', { replace: true });
       } else {
-        // Email/Password sign in for business owner
-        await auth.signInWithPassword(email, password);
-        
-        // Fetch freshly authenticated profile from database to verify role
-        const client = supabase;
-        if (client) {
-          const { data: sessionData } = await client.auth.getSession();
-          const userId = sessionData.session?.user.id;
-          if (userId) {
-            const { data: profileRow } = await client.from('profiles').select('role').eq('id', userId).maybeSingle();
-            const userRole = profileRow?.role;
-            
-            if (userRole && userRole !== 'business_owner' && userRole !== 'admin') {
-              // Account is a customer account! Show clear error and do NOT allow owner access
-              await auth.signOut();
-              setError('This account is a customer account. Please use Customer Sign In or create a Business Owner account.');
-              setBusy(false);
-              return;
-            }
-          }
+        const completion = await auth.signInWithPassword(email, password);
+        if (completion.profile?.role !== 'business_owner' && completion.profile?.role !== 'admin') {
+          await auth.signOut();
+          setError('This account is a customer account. Please use Customer Sign In.');
+          return;
         }
-        
-        await auth.refreshProfile();
-        navigate(resolvePostAuthRoute(auth.profile, auth.ownerBusiness));
+        navigate(completion.destination ?? '/business/onboarding', { replace: true });
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Authentication failed');
+      setError(authErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -229,6 +220,7 @@ export function BusinessAuthPage() {
   return (
     <div className="mx-auto max-w-md py-8">
       <div className="card p-6">
+        {confirmationRequired ? <EmailConfirmation email={email} signInPath="/auth/business" /> : <>
         <Logo />
         <div className="mt-5 flex items-center gap-3 rounded-xl bg-brand-50 p-3 dark:bg-brand-500/10">
           <Store size={20} className="shrink-0 text-brand-600" />
@@ -325,6 +317,7 @@ export function BusinessAuthPage() {
             </a>
           </p>
         </div>
+        </>}
       </div>
     </div>
   );
@@ -384,10 +377,8 @@ export function AuthCallbackPage() {
           }
         }
 
-        await auth.refreshProfile();
-        // Route to trusted destination
-        const dest = resolvePostAuthRoute(auth.profile, auth.ownerBusiness);
-        navigate(dest, { replace: true });
+        const completion = await auth.refreshProfile();
+        navigate(completion.destination ?? '/customer', { replace: true });
       } catch (caught) {
         console.error('[OAuth Callback Resolution Error]:', caught);
         setUrlError(caught instanceof Error ? caught.message : 'OAuth callback resolution failed');
@@ -441,6 +432,7 @@ export function ChooseRolePage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  if (auth.loading) return <CenteredLoading label="Restoring your session…" />;
   if (!auth.user) return <Navigate to="/auth" replace />;
   if (auth.profile?.onboardingComplete) {
     return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
@@ -451,8 +443,8 @@ export function ChooseRolePage() {
     setError('');
     try {
       await auth.chooseRole(role);
-      await auth.refreshProfile();
-      navigate(resolvePostAuthRoute(auth.profile, auth.ownerBusiness));
+      const completion = await auth.refreshProfile();
+      navigate(completion.destination ?? '/customer', { replace: true });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not save role');
       setSaving(false);
@@ -494,6 +486,24 @@ export function ChooseRolePage() {
       {error && <p className="mt-4 text-sm text-error-500">{error}</p>}
     </div>
   );
+}
+
+function EmailConfirmation({ email, signInPath }: { email: string; signInPath: string }) {
+  return <div className="py-4 text-center">
+    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10"><AlertCircle size={22} /></div>
+    <h1 className="mt-4 text-xl font-bold">Check your email</h1>
+    <p className="mt-2 text-sm text-gray-500">Your account was created. Confirm the link sent to <span className="font-medium">{email}</span>, then sign in to continue.</p>
+    <a href={signInPath} className="btn-primary mt-6">Go to sign in</a>
+  </div>;
+}
+
+function authErrorMessage(caught: unknown) {
+  const message = caught instanceof Error ? caught.message : '';
+  if (/invalid login credentials/i.test(message)) return 'Incorrect email or password.';
+  if (/already exists|already registered|already been registered/i.test(message)) return 'An account already exists with this email. Please sign in.';
+  if (/password/i.test(message)) return 'Use a stronger password and try again.';
+  if (/profile/i.test(message)) return 'Your account was created, but the profile could not be loaded. Please sign in again.';
+  return message || 'Authentication failed. Please try again.';
 }
 
 // ============================================================

@@ -34,6 +34,13 @@ export interface OwnerBusinessState {
   paymentGate: 'pending' | 'paid' | 'suspended';
 }
 
+export interface AuthCompletion {
+  destination: string | null;
+  emailConfirmationRequired: boolean;
+  profile: AuthProfile | null;
+  ownerBusiness: OwnerBusinessState | null;
+}
+
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
@@ -42,12 +49,12 @@ interface AuthContextValue {
   loading: boolean;
   isBackendMode: boolean;
   signInWithGoogle: (requestedRole?: Exclude<DatabaseRole, 'admin'>) => Promise<void>;
-  signInWithPassword: (email: string, password: string) => Promise<void>;
-  signUpWithPassword: (email: string, password: string, displayName: string, requestedRole: Exclude<DatabaseRole, 'admin'>) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<AuthCompletion>;
+  signUpWithPassword: (email: string, password: string, displayName: string, requestedRole: Exclude<DatabaseRole, 'admin'>) => Promise<AuthCompletion>;
   chooseRole: (role: Exclude<DatabaseRole, 'admin'>) => Promise<void>;
   completeBusinessOnboarding: () => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<AuthCompletion>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -90,11 +97,7 @@ export function resolvePostAuthRoute(
   if (profile.role === 'admin') return '/admin';
   if (profile.role === 'customer') return '/customer';
   if (profile.role === 'business_owner') {
-    if (!profile.onboardingComplete) return '/onboarding';
-    if (!ownerBusiness) return '/onboarding';
-    if (ownerBusiness.paymentGate === 'pending' || ownerBusiness.paymentGate === 'suspended') {
-      return '/owner/payment-pending';
-    }
+    if (!profile.onboardingComplete || !ownerBusiness) return '/business/onboarding';
     return '/business/dashboard';
   }
   return '/';
@@ -106,32 +109,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [ownerBusiness, setOwnerBusiness] = useState<OwnerBusinessState | null>(null);
   const [loading, setLoading] = useState(dataMode === 'supabase');
 
-  const loadOwnerBusiness = useCallback(async (profileData: AuthProfile | null) => {
+  const loadOwnerBusiness = useCallback(async (profileData: AuthProfile | null): Promise<OwnerBusinessState | null> => {
     if (!supabase || !profileData || profileData.role !== 'business_owner') {
       setOwnerBusiness(null);
-      return;
+      return null;
     }
     try {
       const { data, error } = await supabase.rpc('get_owner_business_state');
-      if (error) { setOwnerBusiness(null); return; }
+      if (error) { setOwnerBusiness(null); return null; }
       if (data && Array.isArray(data) && data.length > 0) {
-        setOwnerBusiness(mapOwnerBusiness(data[0] as Record<string, unknown>));
+        const mapped = mapOwnerBusiness(data[0] as Record<string, unknown>);
+        setOwnerBusiness(mapped);
+        return mapped;
       } else {
         setOwnerBusiness(null);
+        return null;
       }
     } catch {
       setOwnerBusiness(null);
+      return null;
     }
   }, []);
 
   const loadProfile = useCallback(async (userId?: string) => {
-    if (!supabase || !userId) { setProfile(null); setOwnerBusiness(null); return; }
+    if (!supabase || !userId) { setProfile(null); setOwnerBusiness(null); return { profile: null, ownerBusiness: null }; }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (error) throw error;
     const mappedProfile = data ? mapProfile(data as Record<string, unknown>) : null;
     setProfile(mappedProfile);
-    await loadOwnerBusiness(mappedProfile);
+    const mappedOwnerBusiness = await loadOwnerBusiness(mappedProfile);
+    return { profile: mappedProfile, ownerBusiness: mappedOwnerBusiness };
   }, [loadOwnerBusiness]);
+
+  const completeSession = useCallback(async (nextSession: Session | null): Promise<AuthCompletion> => {
+    setSession(nextSession);
+    if (nextSession?.access_token) await supabase?.realtime.setAuth(nextSession.access_token);
+    const next = await loadProfile(nextSession?.user.id);
+    return { destination: next.profile ? resolvePostAuthRoute(next.profile, next.ownerBusiness) : null, emailConfirmationRequired: false, ...next };
+  }, [loadProfile]);
 
   useEffect(() => {
     const client = supabase;
@@ -141,24 +156,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     client.auth.getSession().then(async ({ data, error }) => {
       if (!mounted) return;
       if (error) { setLoading(false); return; }
-      setSession(data.session);
-      if (data.session?.access_token) {
-        await client.realtime.setAuth(data.session.access_token);
-      }
-      try { await loadProfile(data.session?.user.id); } finally { if (mounted) setLoading(false); }
+      try { await completeSession(data.session); } finally { if (mounted) setLoading(false); }
     });
 
     const { data: listener } = client.auth.onAuthStateChange((_event, nextSession) => {
       if (!mounted) return;
-      setSession(nextSession);
-      if (nextSession?.access_token) {
-        void client.realtime.setAuth(nextSession.access_token);
-      }
-      void loadProfile(nextSession?.user.id).catch(() => { setProfile(null); setOwnerBusiness(null); });
+      setLoading(true);
+      void completeSession(nextSession).catch(() => { setProfile(null); setOwnerBusiness(null); }).finally(() => { if (mounted) setLoading(false); });
     });
 
     return () => { mounted = false; listener.subscription.unsubscribe(); };
-  }, [loadProfile]);
+  }, [completeSession]);
 
   const value = useMemo<AuthContextValue>(() => ({
     session,
@@ -192,13 +200,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     signInWithPassword: async (email, password) => {
       if (!supabase) throw new Error('Supabase is not configured.');
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
+      return completeSession(data.session);
     },
 
     signUpWithPassword: async (email, password, displayName, requestedRole) => {
       if (!supabase) throw new Error('Supabase is not configured.');
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -206,6 +215,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       });
       if (error) throw error;
+      if (!data.user) throw new Error('Your account could not be created. Please try again.');
+      if (data.user.identities && data.user.identities.length === 0) {
+        throw new Error('An account already exists with this email. Please sign in.');
+      }
+      // Supabase returns user + no session when Confirm email is enabled. That is
+      // successful registration, not an auth failure or a reason to redirect.
+      if (!data.session) return { destination: null, emailConfirmationRequired: true, profile: null, ownerBusiness: null };
+      return completeSession(data.session);
     },
 
     chooseRole: async (role) => {
@@ -231,8 +248,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOwnerBusiness(null);
     },
 
-    refreshProfile: async () => loadProfile(session?.user.id),
-  }), [session, profile, ownerBusiness, loading, loadProfile]);
+    refreshProfile: async () => {
+      const next = await loadProfile(session?.user.id);
+      return { destination: next.profile ? resolvePostAuthRoute(next.profile, next.ownerBusiness) : null, emailConfirmationRequired: false, ...next };
+    },
+  }), [session, profile, ownerBusiness, loading, loadProfile, completeSession]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
