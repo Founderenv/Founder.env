@@ -15,7 +15,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onClose} />
-      <div className="relative w-full max-w-md card shadow-2xl animate-slide-up max-h-[85vh] overflow-hidden flex flex-col rounded-b-none sm:rounded-2xl">
+      <div className="relative w-full max-w-md card shadow-2xl animate-slide-up max-h-[85vh] overflow-hidden flex flex-col rounded-b-none sm:rounded-2xl" role="dialog" aria-modal="true" aria-label={title}>
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-800">
           {title && <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">{title}</h2>}
           <button onClick={onClose} className="ml-auto rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close">

@@ -12,7 +12,8 @@ interface ShareSheetProps {
 
 export function ShareSheet({ open, onClose, title, url }: ShareSheetProps) {
   const [copied, setCopied] = useState(false);
-  const shareUrl = new URL(url, window.location.origin).href;
+  const publicOrigin = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'https://founder-env-sigma.vercel.app' : window.location.origin;
+  const shareUrl = new URL(url, publicOrigin).href;
 
   const copyLink = () => {
     navigator.clipboard?.writeText(shareUrl).then(() => {
@@ -75,10 +76,24 @@ interface ShareButtonProps {
 
 export function ShareButton({ title, url, className }: ShareButtonProps) {
   const [open, setOpen] = useState(false);
+  const publicOrigin = ['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'https://founder-env-sigma.vercel.app' : window.location.origin;
+  const shareUrl = new URL(url, publicOrigin).href;
+
+  const share = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, text: title, url: shareUrl });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
+    }
+    setOpen(true);
+  };
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); void share(); }}
         className={cn('rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300', className)}
         aria-label="Share"
       >

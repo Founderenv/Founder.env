@@ -302,8 +302,9 @@ export interface DealClaim {
   businessLogo: string;
   customerId: string;
   customerName: string;
+  claimCode: string;
   claimedAt: string;
-  status: 'claimed' | 'used' | 'expired';
+  status: 'claimed' | 'redeemed' | 'expired';
 }
 
 export interface Review {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { LoaderCircle, LockKeyhole, Store, User, AlertCircle } from 'lucide-react';
 import { useAuth, consumeOAuthRoleIntent, resolvePostAuthRoute } from '@/auth/AuthProvider';
 import { Logo } from '@/components/layout/Navigation';
@@ -14,6 +14,9 @@ import { dataMode, supabase } from '@/lib/supabase';
 export function AuthPage() {
   const auth = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedReturn = (location.state as { returnTo?: string } | null)?.returnTo;
+  const returnTo = requestedReturn?.startsWith('/') ? requestedReturn : null;
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +30,7 @@ export function AuthPage() {
   // Already authenticated → route using trusted post-auth resolver
   if (auth.loading) return <CenteredLoading label="Restoring your session…" />;
   if (auth.user && auth.profile) {
-    return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
+    return <Navigate to={auth.profile.role === 'customer' && returnTo ? returnTo : resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
   }
   if (dataMode !== 'supabase') return <AuthUnavailable />;
 
@@ -41,10 +44,10 @@ export function AuthPage() {
         // Email signup: creates a CUSTOMER account
         const completion = await auth.signUpWithPassword(email, password, name, 'customer');
         if (completion.emailConfirmationRequired) { setConfirmationRequired(true); return; }
-        navigate(completion.destination ?? '/customer', { replace: true });
+        navigate(returnTo ?? completion.destination ?? '/customer', { replace: true });
       } else {
         const completion = await auth.signInWithPassword(email, password);
-        navigate(completion.destination ?? '/customer', { replace: true });
+        navigate(returnTo ?? completion.destination ?? '/customer', { replace: true });
       }
     } catch (caught) {
       setError(authErrorMessage(caught));

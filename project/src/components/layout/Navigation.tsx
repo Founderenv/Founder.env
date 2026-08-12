@@ -1,10 +1,11 @@
 import { type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
 import { type Role } from '@/types';
 import { cn } from '@/utils/format';
 import { useState } from 'react';
 import { dataMode } from '@/lib/supabase';
+import { useAuth } from '@/auth/AuthProvider';
 
 interface NavItem {
   to: string;
@@ -22,7 +23,7 @@ const customerNav: NavItem[] = [
 
 const ownerNav: NavItem[] = [
   { to: '/business/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/owner/home', label: 'Home', icon: Home },
+  { to: '/', label: 'Home', icon: Home },
   { to: '/owner/create', label: 'Create', icon: Plus },
   { to: '/owner/profile', label: 'Profile', icon: User },
   { to: '/messages', label: 'Messages', icon: MessageCircle },
@@ -30,7 +31,27 @@ const ownerNav: NavItem[] = [
   { to: '/owner/qr', label: 'QR', icon: Menu },
 ];
 
-const ownerMobileNav = ownerNav.filter((item) => ['/business/dashboard', '/owner/home', '/owner/create', '/owner/profile', '/owner/analytics'].includes(item.to));
+const ownerMobileNav = ownerNav.filter((item) => ['/business/dashboard', '/', '/owner/create', '/owner/profile', '/owner/analytics'].includes(item.to));
+
+function LogoutButton({ onDone }: { onDone?: () => void }) {
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  const logout = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await signOut();
+      onDone?.();
+      navigate('/auth/business', { replace: true });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <button type="button" onClick={() => void logout()} disabled={busy} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-error-600 hover:bg-error-50 disabled:opacity-60 dark:hover:bg-error-500/10"><LogOut size={19} />{busy ? 'Logging out...' : 'Logout'}</button>;
+}
 
 const previewOwnerTools: NavItem[] = [
   { to: '/owner/edit', label: 'Settings', icon: User },
@@ -111,7 +132,7 @@ export function DesktopSidebar({ role, children }: { role: Role; children: React
             );
           })}
         </nav>
-        {role === 'owner' && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">Manage</p><nav className="flex flex-col gap-1">{ownerTools.map((item) => <Link key={item.to} to={item.to} className={cn('flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium', location.pathname === item.to ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-500' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800')}><item.icon size={19} />{item.label}</Link>)}</nav></>}
+        {role === 'owner' && <><p className="mb-2 mt-7 px-3 text-[10px] font-semibold uppercase tracking-widest text-gray-400">Manage</p><nav className="flex flex-col gap-1">{ownerTools.map((item) => <Link key={item.to} to={item.to} className={cn('flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium', location.pathname === item.to ? 'bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-500' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800')}><item.icon size={19} />{item.label}</Link>)}<LogoutButton /></nav></>}
       </aside>
       <main className="flex-1 min-w-0">{children}</main>
     </div>
@@ -221,6 +242,7 @@ export function TopNavigation({ role }: { role: Role }) {
                 {item.label}
               </Link>
             ))}
+            {role === 'owner' && <LogoutButton onDone={() => setMobileMenuOpen(false)} />}
           </nav>
         </div>
       )}

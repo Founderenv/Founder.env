@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { MobileNavigation, DesktopSidebar, TopNavigation } from '@/components/layout/Navigation';
 import { DevPreviewSwitcher } from '@/components/layout/DevPreviewSwitcher';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -20,32 +20,10 @@ export function AppShell({ children, showNav = true, maxWidth = 'feed' }: AppShe
   const location = useLocation();
 
   const isAdmin = location.pathname.startsWith('/admin');
-  const isLanding = location.pathname === '/' && role === 'guest';
   const isQR = location.pathname.startsWith('/q/');
 
   if (isQR) {
     return <>{children}</>;
-  }
-
-  if (isLanding) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-950">
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
-          <ThemeToggle theme={theme} setTheme={setTheme} />
-          {isBackendMode ? (
-            <div className="flex items-center gap-2">
-              <Link to="/auth/business" className="btn-outline text-sm">
-                List Business
-              </Link>
-              <Link to="/auth" className="btn-primary text-sm">Sign in</Link>
-            </div>
-          ) : (
-            <DevPreviewSwitcher role={role} setRole={setRole} />
-          )}
-        </div>
-        {children}
-      </div>
-    );
   }
 
   if (isAdmin) {

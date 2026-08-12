@@ -7,6 +7,8 @@ import { cn, timeAgo, formatNumber } from '@/utils/format';
 import type { Comment, Post } from '@/types';
 import { postService } from '@/services';
 import { useCurrentCustomer } from '@/hooks/useCurrentCustomer';
+import { useAuth } from '@/auth/AuthProvider';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface CommentSheetProps {
   open: boolean;
@@ -16,31 +18,52 @@ interface CommentSheetProps {
 
 export function CommentSheet({ open, onClose, post }: CommentSheetProps) {
   const currentCustomer = useCurrentCustomer();
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const submittingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open && post) {
       setLoading(true);
-      postService.getComments(post.id).then((c) => {
-        setComments(c);
-        setLoading(false);
-      });
+      setError('');
+      postService.getComments(post.id).then(setComments).catch((caught: unknown) => {
+        setError(caught instanceof Error ? caught.message : 'Comments could not be loaded.');
+      }).finally(() => setLoading(false));
     }
   }, [open, post]);
 
-  const submit = () => {
+  const submit = async () => {
     if (!text.trim() || !post) return;
-    postService.addComment(
-      post.id, text.trim(),
-      currentCustomer.id, currentCustomer.displayName, currentCustomer.avatarUrl, 'customer'
-    ).then((c) => {
+    if (auth.isBackendMode && !auth.user) {
+      onClose();
+      navigate('/auth', { state: { returnTo: location.pathname } });
+      return;
+    }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError('');
+    try {
+      const c = await postService.addComment(
+        post.id, text.trim(), currentCustomer.id, currentCustomer.displayName, currentCustomer.avatarUrl,
+        auth.profile?.role === 'business_owner' ? 'owner' : 'customer'
+      );
       setComments((prev) => [...prev, c]);
       setText('');
       setTimeout(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }), 100);
-    });
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : 'Your comment could not be posted.');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -75,18 +98,19 @@ export function CommentSheet({ open, onClose, post }: CommentSheetProps) {
           ))
         )}
       </div>
+      {error && <p className="mb-3 rounded-lg bg-error-50 p-2 text-xs text-error-600 dark:bg-error-500/10">{error}</p>}
       <div className="flex items-center gap-2 border-t border-gray-200 pt-3 dark:border-gray-800">
         <Avatar src={currentCustomer.avatarUrl} alt={currentCustomer.displayName} size="sm" />
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          onKeyDown={(e) => { if (e.key === 'Enter') void submit(); }}
           placeholder="Add a comment..."
           className="flex-1 input py-2"
         />
         <button
-          onClick={submit}
-          disabled={!text.trim()}
+          onClick={() => void submit()}
+          disabled={!text.trim() || submitting}
           className={cn('rounded-xl p-2.5 transition-colors', text.trim() ? 'text-brand-600' : 'text-gray-300 dark:text-gray-600')}
           aria-label="Send comment"
         >

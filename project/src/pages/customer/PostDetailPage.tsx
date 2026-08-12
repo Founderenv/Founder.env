@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { PostCard } from '@/components/social/PostCard';
+import { CommentSheet } from '@/components/social/CommentSheet';
 import { ErrorState, FeedSkeleton } from '@/components/ui/States';
 import { postService } from '@/services';
 import type { Post } from '@/types';
@@ -11,6 +12,7 @@ export function PostDetailPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [commentPost, setCommentPost] = useState<Post | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -37,7 +39,8 @@ export function PostDetailPage() {
       <Link to={`/business/${post.businessUsername}`} className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
         <ChevronLeft size={18} /> {post.businessName}
       </Link>
-      <PostCard post={post} />
+      <PostCard post={post} onComment={setCommentPost} />
+      <CommentSheet open={!!commentPost} onClose={() => setCommentPost(null)} post={commentPost} />
     </div>
   );
 }

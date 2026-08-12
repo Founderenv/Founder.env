@@ -22,9 +22,10 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
   const navigate = useNavigate();
   const followPending = useRef(false);
   const postActionPending = useRef(false);
+  const isOwnBusiness = auth.profile?.role === 'business_owner' && auth.ownerBusiness?.businessId === post.businessId;
 
   const runCustomerAction = async (action: () => Promise<Post | null>) => {
-    if (!auth.user || auth.profile?.role !== 'customer') {
+    if (auth.isBackendMode && (!auth.user || auth.profile?.role !== 'customer')) {
       navigate('/auth');
       return;
     }
@@ -42,7 +43,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
   };
 
   const followBusiness = async () => {
-    if (!auth.user || auth.profile?.role !== 'customer') {
+    if (auth.isBackendMode && (!auth.user || auth.profile?.role !== 'customer')) {
       navigate('/auth');
       return;
     }
@@ -50,7 +51,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
     followPending.current = true;
     setActionError('');
     try {
-      await followService.follow(post.businessId, auth.user.id, auth.profile.displayName, auth.profile.avatarUrl ?? '', 'explore');
+      await followService.follow(post.businessId, auth.user?.id ?? '', auth.profile?.displayName ?? '', auth.profile?.avatarUrl ?? '', 'explore');
       setPost((current) => ({ ...current, isFollowing: true }));
     } catch (caught: unknown) {
       setActionError(caught instanceof Error ? caught.message : 'This business could not be followed.');
@@ -87,7 +88,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {!post.isFollowing && (
+          {!isOwnBusiness && !post.isFollowing && (
             <FollowButton isFollowing={post.isFollowing} onToggle={() => void followBusiness()} size="sm" />
           )}
           <button onClick={() => window.alert('Content reporting options will be submitted through the backend.')} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="More">
@@ -106,6 +107,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
         {post.dealId && (
           <Link
             to={`/business/${post.businessUsername}/deals`}
+            onClick={(event) => event.stopPropagation()}
             className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold text-gray-900 backdrop-blur-sm hover:bg-white"
           >
             <Tag size={14} /> View Deal
@@ -141,7 +143,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <ShareButton title={`${post.businessName} on Founder.env`} url={`/post/${post.id}`} />
+          <ShareButton title={`${post.businessName}: ${post.caption.slice(0, 100)}`} url={`/post/${post.id}`} />
           <button onClick={toggleSave} className="no-tap" aria-label="Save">
             <Bookmark
               size={22}

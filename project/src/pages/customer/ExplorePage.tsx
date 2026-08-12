@@ -32,9 +32,12 @@ export function ExplorePage() {
 
   useEffect(() => { loadBusinesses(); }, [loadBusinesses]);
 
-  const filteredBusinesses = activeCategory === 'all'
-    ? businesses
-    : businesses.filter((b) => b.category.toLowerCase() === activeCategory);
+  const selectedCategory = categories.find((category) => category.slug === activeCategory);
+  const categoryTerms = activeCategory === 'all'
+    ? []
+    : [activeCategory, selectedCategory?.name.toLowerCase() ?? '', activeCategory === 'fitness' ? 'gym' : '', activeCategory === 'fashion' ? 'clothing' : ''].filter(Boolean);
+  const matchesCategory = (value: string) => categoryTerms.some((term) => value.toLowerCase().includes(term));
+  const filteredBusinesses = activeCategory === 'all' ? businesses : businesses.filter((business) => matchesCategory(business.category));
 
   const searchedBusinesses = query
     ? filteredBusinesses.filter((b) =>
@@ -44,13 +47,14 @@ export function ExplorePage() {
       )
     : filteredBusinesses;
 
+  const categoryDeals = activeCategory === 'all' ? deals : deals.filter((deal) => matchesCategory(deal.category));
   const searchedDeals = query
-    ? deals.filter((d) => d.title.toLowerCase().includes(query.toLowerCase()) || d.businessName.toLowerCase().includes(query.toLowerCase()))
-    : deals;
+    ? categoryDeals.filter((deal) => `${deal.title} ${deal.description} ${deal.businessName} ${deal.category}`.toLowerCase().includes(query.toLowerCase()))
+    : categoryDeals;
 
   return (
     <div className="max-w-3xl mx-auto pb-4">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Explore</h1>
+      <div className="mb-4"><h1 className="text-2xl font-bold text-gray-900 dark:text-white">Discover Founder.env</h1><p className="mt-1 text-sm text-gray-500">Find local businesses, categories, and current deals.</p></div>
 
       {/* Search */}
       <div className="relative mb-4">
@@ -59,6 +63,7 @@ export function ExplorePage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search businesses, deals, categories..."
+          aria-label="Search Founder.env"
           className="input pl-11"
         />
         <button
@@ -101,6 +106,7 @@ export function ExplorePage() {
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.slug)}
+              aria-pressed={activeCategory === cat.slug}
               className={cn(
                 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors',
                 activeCategory === cat.slug ? 'bg-brand-600 text-white' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'

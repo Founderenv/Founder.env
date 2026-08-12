@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Clock, Tag, Bookmark, Flame, Check } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Clock, Tag, Bookmark, Flame, Check, Loader2 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge } from '@/components/ui/StatusBadge';
 import { ShareButton } from '@/components/ui/ShareSheet';
 import { formatCurrency, timeUntil, cn } from '@/utils/format';
 import type { Deal } from '@/types';
 import { dealService } from '@/services';
+import { Modal } from '@/components/ui/Modal';
+import { useAuth } from '@/auth/AuthProvider';
+import type { DealClaim } from '@/types';
 
 interface DealCardProps {
   deal: Deal;
@@ -16,22 +19,59 @@ interface DealCardProps {
 
 export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps) {
   const [deal, setDeal] = useState(initialDeal);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claim, setClaim] = useState<DealClaim | null>(null);
+  const [actionError, setActionError] = useState('');
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const now = Date.now();
+  const isScheduled = Date.parse(deal.startDate) > now;
+  const isExpired = Date.parse(deal.endDate) < now;
+  const isSoldOut = deal.maxClaims > 0 && deal.claimedCount >= deal.maxClaims;
+  const unavailableLabel = isScheduled ? 'Scheduled' : isExpired ? 'Expired' : isSoldOut ? 'Fully Claimed' : '';
 
   const handleClaim = () => {
-    if (deal.isClaimed) {
-      window.alert('This deal is already in your reward wallet. Redemption verification requires the backend.');
+    if (auth.isBackendMode && (!auth.user || auth.profile?.role !== 'customer')) {
+      navigate('/auth', { state: { returnTo: location.pathname } });
       return;
     }
-    dealService.claim(deal.id).then((updated) => {
-      if (updated) {
-        setDeal(updated);
-        onClaim?.(updated);
-      }
-    });
+    if (deal.isClaimed) {
+      setClaimOpen(true);
+      return;
+    }
+    setActionError('');
+    setClaimOpen(true);
   };
 
-  const toggleSave = () => {
-    dealService.toggleSave(deal.id).then((updated) => updated && setDeal(updated));
+  const confirmClaim = async () => {
+    if (claiming) return;
+    setClaiming(true);
+    setActionError('');
+    try {
+      const result = await dealService.claim(deal.id);
+      setDeal(result.deal);
+      setClaim(result.claim);
+      onClaim?.(result.deal);
+    } catch (caught: unknown) {
+      setActionError(caught instanceof Error ? caught.message : 'This deal could not be claimed.');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const toggleSave = async () => {
+    if (auth.isBackendMode && (!auth.user || auth.profile?.role !== 'customer')) {
+      navigate('/auth', { state: { returnTo: location.pathname } });
+      return;
+    }
+    try {
+      const updated = await dealService.toggleSave(deal.id);
+      if (updated) setDeal(updated);
+    } catch (caught: unknown) {
+      setActionError(caught instanceof Error ? caught.message : 'This deal could not be saved.');
+    }
   };
 
   if (compact) {
@@ -41,7 +81,7 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
         className="card overflow-hidden transition-all hover:shadow-md active:scale-[0.98] block"
       >
         <div className="relative h-32">
-          <img src={deal.mediaUrl} alt={deal.title} className="h-full w-full object-cover" loading="lazy" />
+          {deal.mediaUrl ? <img src={deal.mediaUrl} alt={deal.title} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"><Tag size={32} /></div>}
           <span className="absolute top-2 left-2 badge bg-accent-500 text-white">
             <Flame size={12} /> {deal.discount}% OFF
           </span>
@@ -73,12 +113,12 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">{deal.businessCategory} • {deal.city}</p>
         </div>
-        <ShareButton title={deal.title} url={`/#/business/${deal.businessUsername}/deals`} />
+        <ShareButton title={`${deal.title} from ${deal.businessName}`} url={`/business/${deal.businessUsername}/deals`} />
       </div>
 
       <Link to={`/business/${deal.businessUsername}/deals`}>
         <div className="relative aspect-[4/3] bg-gray-100 dark:bg-gray-800">
-          <img src={deal.mediaUrl} alt={deal.title} className="h-full w-full object-cover" loading="lazy" />
+          {deal.mediaUrl ? <img src={deal.mediaUrl} alt={deal.title} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400"><Tag size={48} /></div>}
           <div className="absolute top-3 left-3 flex gap-2">
             <span className="badge bg-accent-500 text-white">
               <Flame size={12} /> {deal.discount}% OFF
@@ -108,11 +148,11 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
         </div>
 
         <div className="mt-3 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-          <span>{deal.claimedCount} of {deal.maxClaims} claimed</span>
+          <span>{deal.claimedCount}{deal.maxClaims > 0 ? ` of ${deal.maxClaims}` : ''} claimed</span>
           <div className="h-1.5 w-20 rounded-full bg-gray-200 dark:bg-gray-700">
             <div
               className="h-full rounded-full bg-brand-500"
-              style={{ width: `${(deal.claimedCount / deal.maxClaims) * 100}%` }}
+              style={{ width: `${deal.maxClaims > 0 ? Math.min(100, (deal.claimedCount / deal.maxClaims) * 100) : 0}%` }}
             />
           </div>
         </div>
@@ -120,7 +160,7 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
         <div className="mt-4 flex items-center gap-2">
           <button
             onClick={handleClaim}
-            disabled={deal.isClaimed}
+            disabled={deal.isClaimed || Boolean(unavailableLabel)}
             className={cn(
               'flex-1 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all active:scale-[0.98]',
               deal.isClaimed
@@ -129,10 +169,10 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
             )}
           >
             <Tag size={16} />
-            {deal.isClaimed ? 'Claimed' : 'Claim Deal'}
+            {deal.isClaimed ? 'Deal Claimed' : unavailableLabel || deal.ctaLabel}
           </button>
           <button
-            onClick={toggleSave}
+            onClick={() => void toggleSave()}
             className="rounded-xl border border-gray-200 p-2.5 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900"
             aria-label="Save deal"
           >
@@ -144,7 +184,34 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
             />
           </button>
         </div>
+        {actionError && <p className="mt-3 rounded-lg bg-error-50 p-2 text-xs text-error-600 dark:bg-error-500/10">{actionError}</p>}
       </div>
+      <Modal open={claimOpen} onClose={() => setClaimOpen(false)} title={claim ? 'Deal Claimed' : 'Claim Deal'} size="sm">
+        <div className="space-y-4">
+          <div>
+            <p className="font-semibold text-gray-900 dark:text-white">{deal.title}</p>
+            <p className="mt-1 text-sm text-gray-500">{deal.businessName}</p>
+            <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{deal.description}</p>
+          </div>
+          {deal.terms && <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300"><span className="font-semibold">Terms: </span>{deal.terms}</div>}
+          {claim ? (
+            <div className="rounded-lg border border-success-200 bg-success-50 p-4 text-center dark:border-success-500/30 dark:bg-success-500/10">
+              <Check className="mx-auto text-success-600" size={28} />
+              <p className="mt-2 font-semibold text-success-700 dark:text-success-400">Deal Claimed</p>
+              <p className="mt-3 text-xs text-gray-500">Show this code to the business</p>
+              <p className="mt-1 break-all font-mono text-lg font-bold text-gray-900 dark:text-white">{claim.claimCode}</p>
+            </div>
+          ) : deal.isClaimed ? (
+            <p className="rounded-lg bg-success-50 p-3 text-sm font-medium text-success-700 dark:bg-success-500/10 dark:text-success-400">This deal is already in your claimed deals.</p>
+          ) : (
+            <button type="button" onClick={() => void confirmClaim()} disabled={claiming} className="btn-primary w-full">
+              {claiming ? <Loader2 size={16} className="animate-spin" /> : <Tag size={16} />}
+              {claiming ? 'Claiming...' : 'Confirm Claim'}
+            </button>
+          )}
+          {actionError && <p className="rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10">{actionError}</p>}
+        </div>
+      </Modal>
     </div>
   );
 }

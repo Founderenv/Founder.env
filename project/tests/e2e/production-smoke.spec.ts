@@ -24,6 +24,8 @@ test.describe('production public launch gate', () => {
 
       await page.goto('/');
       await expect(page).toHaveTitle(/Founder\.env/);
+      await expect(page.getByRole('heading', { name: 'Discover Founder.env' }).filter({ visible: true })).toBeVisible();
+      await expect(page.getByLabel('Search Founder.env').filter({ visible: true })).toBeVisible();
       await expect(page.locator('body')).not.toContainText('Application error');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
@@ -41,7 +43,7 @@ test.describe('production public launch gate', () => {
       const businessHref = `/business/${businesses[0].username}`;
       expect(businessHref).toBeTruthy();
       await page.goto(businessHref!);
-      await expect(page.getByRole('button', { name: 'Share' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Share' }).filter({ visible: true }).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
 
       const postResponse = await page.request.get(`${localEnv.VITE_SUPABASE_URL}/rest/v1/posts?select=id&status=eq.published&limit=1`, {
@@ -52,10 +54,10 @@ test.describe('production public launch gate', () => {
       expect(posts.length).toBeGreaterThan(0);
       await page.goto(`/post/${posts[0].id}`);
       await expect(page.getByRole('article')).toBeVisible();
-      const shareButton = page.getByRole('button', { name: 'Share' });
+      const shareButton = page.getByRole('button', { name: 'Share' }).filter({ visible: true }).first();
       await expect(shareButton).toBeVisible();
       await shareButton.click();
-      await expect(page.locator('input[readonly]')).toHaveValue(new URL(`/post/${posts[0].id}`, page.url()).href);
+      await expect(page.locator('input[readonly]')).toHaveValue(`https://founder-env-sigma.vercel.app/post/${posts[0].id}`);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
       expect(founderErrors(errors)).toEqual([]);
     });

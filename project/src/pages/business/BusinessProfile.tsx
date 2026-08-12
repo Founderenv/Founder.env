@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { MapPin, Phone, MessageCircle, Star, Edit, Plus, BarChart3, QrCode, Instagram, Globe, Navigation, ChevronLeft } from 'lucide-react';
+import { Phone, MessageCircle, Star, Edit, Plus, BarChart3, QrCode, Instagram, Globe, Navigation, ChevronLeft } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge, StatusBadge } from '@/components/ui/StatusBadge';
 import { FollowButton } from '@/components/ui/FollowButton';
@@ -49,7 +49,10 @@ export function BusinessProfile() {
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [requestingBill, setRequestingBill] = useState(false);
+  const [followDelta, setFollowDelta] = useState(0);
+  const [followError, setFollowError] = useState('');
   const billRequestPending = useRef(false);
+  const followPending = useRef(false);
 
   const activeUserId = dataMode === 'supabase' ? auth.user?.id : currentCustomer.id;
   const isOwner = role === 'owner' && (dataMode === 'mock' || business?.ownerId === activeUserId);
@@ -82,15 +85,28 @@ export function BusinessProfile() {
   if (loading) return <div className="max-w-2xl mx-auto"><ProfileSkeleton /></div>;
   if (error || !business) return <ErrorState title="Business unavailable" description={error || 'This business could not be found.'} />;
 
-  const handleFollow = () => {
+  const handleFollow = async () => {
     if (dataMode === 'supabase' && (!auth.user || auth.profile?.role !== 'customer')) {
       navigate('/auth');
       return;
     }
-    if (isFollowing) {
-      followService.unfollow(business.id, currentCustomer.id).then(() => setIsFollowing(false));
-    } else {
-      followService.follow(business.id, currentCustomer.id, currentCustomer.displayName, currentCustomer.avatarUrl, 'profile').then(() => setIsFollowing(true));
+    if (followPending.current) return;
+    followPending.current = true;
+    setFollowError('');
+    try {
+      if (isFollowing) {
+        await followService.unfollow(business.id, currentCustomer.id);
+        setIsFollowing(false);
+        setFollowDelta((value) => value - 1);
+      } else {
+        await followService.follow(business.id, currentCustomer.id, currentCustomer.displayName, currentCustomer.avatarUrl, 'profile');
+        setIsFollowing(true);
+        setFollowDelta((value) => value + 1);
+      }
+    } catch (caught: unknown) {
+      setFollowError(caught instanceof Error ? caught.message : 'Follow could not be updated.');
+    } finally {
+      followPending.current = false;
     }
   };
 
@@ -114,7 +130,7 @@ export function BusinessProfile() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-[calc(100vw-1.5rem)] overflow-x-hidden pb-4 sm:max-w-2xl">
       {/* Cover */}
-      <div className="relative h-44 sm:h-56 rounded-b-2xl overflow-hidden">
+      <div className="relative aspect-[5/2] min-h-40 max-h-56 overflow-hidden rounded-b-2xl">
         <img src={business.coverUrl} alt={business.name} className="h-full w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <Link to="/" className="absolute top-3 left-3 rounded-xl bg-white/90 p-2 text-gray-700 backdrop-blur-sm hover:bg-white">
@@ -126,9 +142,9 @@ export function BusinessProfile() {
       </div>
 
       {/* Header */}
-      <div className="px-4 -mt-12">
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <Avatar src={business.logoUrl} alt={business.name} size="xl" ring />
+      <div className="px-4">
+        <div className="relative z-20 -mt-12 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="shrink-0 rounded-full bg-white p-1 shadow-sm dark:bg-gray-950"><Avatar src={business.logoUrl} alt={business.name} size="xl" ring /></div>
           <div className="flex w-full flex-wrap gap-2 pb-1 sm:w-auto sm:max-w-none sm:justify-end">
             {isOwner ? (
               <>
@@ -138,7 +154,7 @@ export function BusinessProfile() {
               </>
             ) : (
               <>
-                <FollowButton isFollowing={isFollowing} onToggle={handleFollow} size="sm" />
+                {role !== 'owner' && <FollowButton isFollowing={isFollowing} onToggle={() => void handleFollow()} size="sm" />}
                 {dataMode === 'supabase' && auth.profile?.role === 'customer' && <button type="button" className="btn-primary text-xs px-3 py-2" disabled={!isFollowing || requestingBill} onClick={() => void handleRequestBill()}>{requestingBill ? 'Requesting...' : 'Request Bill'}</button>}
                 <Link to="/messages" className="btn-outline text-xs px-3 py-2"><MessageCircle size={14} /> Message</Link>
               </>
@@ -156,7 +172,7 @@ export function BusinessProfile() {
 
           <div className="mt-2 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap sm:gap-3">
             <button onClick={() => setShowFollowersModal(true)} className="justify-self-start text-sm">
-              <span className="font-bold text-gray-900 dark:text-white">{formatNumber(business.followerCount)}</span>
+              <span className="font-bold text-gray-900 dark:text-white">{formatNumber(Math.max(0, business.followerCount + followDelta))}</span>
               <span className="text-gray-500 dark:text-gray-400"> followers</span>
             </button>
             <button onClick={() => setActiveTab('reviews')} className="justify-self-start text-sm">
@@ -168,6 +184,7 @@ export function BusinessProfile() {
           </div>
 
           <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{business.bio}</p>
+          {followError && <p className="mt-2 rounded-lg bg-error-50 p-2 text-xs text-error-600 dark:bg-error-500/10">{followError}</p>}
 
           {!isOwner && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -184,7 +201,7 @@ export function BusinessProfile() {
           )}
           {isOwner && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link to="/owner/create" className="btn-primary text-xs px-3 py-2"><Plus size={14} /> Add Story</Link>
+              <Link to="/owner/create?type=story" className="btn-primary text-xs px-3 py-2"><Plus size={14} /> Add Story</Link>
               <Link to="/owner/create" className="btn-outline text-xs px-3 py-2"><Plus size={14} /> Create Post</Link>
             </div>
           )}
@@ -225,6 +242,7 @@ export function BusinessProfile() {
       </div>
 
       {/* Tabs */}
+      {(location.state as { notice?: string } | null)?.notice && <div className="mx-4 mt-4 rounded-lg bg-success-50 p-3 text-sm font-medium text-success-700 dark:bg-success-500/10 dark:text-success-400">{(location.state as { notice: string }).notice}</div>}
       <div className="mt-4 px-4 sticky top-14 lg:top-16 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm z-10 -mx-0">
         <Tabs
           tabs={[
@@ -245,10 +263,10 @@ export function BusinessProfile() {
         {!dataLoaded ? (
           <LoadingSpinner size={32} className="py-12" />
         ) : activeTab === 'page' ? (
-          <BusinessPageTab business={business} reviews={reviews} />
+          <BusinessPageTab business={business} reviews={reviews} deals={deals.filter((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now())} posts={posts} onComment={setCommentPost} />
         ) : activeTab === 'deals' ? (
-          deals.length > 0 ? (
-            <div className="space-y-4">{deals.map((d) => <DealCard key={d.id} deal={d} />)}</div>
+          deals.some((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now()) ? (
+            <div className="space-y-4">{deals.filter((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now()).map((d) => <DealCard key={d.id} deal={d} />)}</div>
           ) : (
             <EmptyState icon="Tag" title="No deals available" description="Check back later for exclusive offers." />
           )
@@ -289,7 +307,7 @@ export function BusinessProfile() {
   );
 }
 
-function BusinessPageTab({ business, reviews }: { business: import('@/types').Business; reviews: Review[] }) {
+function BusinessPageTab({ business, reviews, deals, posts, onComment }: { business: import('@/types').Business; reviews: Review[]; deals: Deal[]; posts: Post[]; onComment: (post: Post) => void }) {
   return (
     <div className="space-y-6">
       {business.todayOffer && (
@@ -299,10 +317,9 @@ function BusinessPageTab({ business, reviews }: { business: import('@/types').Bu
         </div>
       )}
 
-      <section>
-        <h2 className="section-title mb-2">About</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{business.description}</p>
-      </section>
+      {deals.length > 0 && <section><h2 className="section-title mb-3">Featured Deals</h2><div className="space-y-4">{deals.slice(0, 2).map((deal) => <DealCard key={deal.id} deal={deal} />)}</div></section>}
+
+      {posts.length > 0 && <section><h2 className="section-title mb-3">Recent Posts</h2><div className="space-y-4">{posts.slice(0, 2).map((post) => <PostCard key={post.id} post={post} onComment={onComment} />)}</div></section>}
 
       {business.featuredProducts.length > 0 && (
         <section>
@@ -351,49 +368,6 @@ function BusinessPageTab({ business, reviews }: { business: import('@/types').Bu
           </div>
         </section>
       )}
-
-      <section>
-        <h2 className="section-title mb-3">Opening Hours</h2>
-        <div className="card divide-y divide-gray-200 dark:divide-gray-800">
-          {business.openingHours.map((h) => (
-            <div key={h.day} className="flex items-center justify-between px-4 py-2.5 text-sm">
-              <span className="text-gray-600 dark:text-gray-400">{h.day}</span>
-              <span className={cn('font-medium', h.closed ? 'text-error-500' : 'text-gray-900 dark:text-gray-100')}>
-                {h.closed ? 'Closed' : `${h.open} - ${h.close}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="section-title mb-3">Location & Contact</h2>
-        <div className="card p-4 space-y-3">
-          <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <MapPin size={18} className="mt-0.5 shrink-0 text-brand-600" />
-            <span>{business.address}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <Phone size={18} className="shrink-0 text-brand-600" />
-            <a href={`tel:${business.phone}`} className="hover:underline">{business.phone}</a>
-          </div>
-          {business.socialLinks.instagram && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Instagram size={18} className="shrink-0 text-brand-600" />
-              <a href={`https://instagram.com/${business.socialLinks.instagram}`} target="_blank" rel="noopener noreferrer" className="hover:underline">@{business.socialLinks.instagram}</a>
-            </div>
-          )}
-          {business.socialLinks.website && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Globe size={18} className="shrink-0 text-brand-600" />
-              <a href={`https://${business.socialLinks.website}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{business.socialLinks.website}</a>
-            </div>
-          )}
-          <a href={`https://maps.google.com?q=${encodeURIComponent(business.address)}`} target="_blank" rel="noopener noreferrer" className="btn-outline w-full mt-2">
-            <Navigation size={16} /> Get Directions
-          </a>
-        </div>
-      </section>
 
       <section>
         <div className="mb-3 flex items-center justify-between"><h2 className="section-title">Reviews</h2><RatingStars rating={business.rating} showValue reviewCount={business.reviewCount} /></div>
@@ -461,22 +435,35 @@ function ReviewsTab({ reviews, isOwner, onWriteReview, businessId }: { reviews: 
 }
 
 function AboutTab({ business }: { business: import('@/types').Business }) {
+  const websiteUrl = business.socialLinks.website
+    ? (/^https?:\/\//i.test(business.socialLinks.website) ? business.socialLinks.website : `https://${business.socialLinks.website}`)
+    : '';
   return (
     <div className="space-y-4">
+      <div className="card p-4">
+        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-gray-100">Description</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{business.description || business.bio}</p>
+      </div>
       <div className="card p-4">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Business Information</h3>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Category</span><span className="text-gray-900 dark:text-gray-100">{business.category}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Location</span><span className="text-gray-900 dark:text-gray-100">{business.location}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Phone</span><span className="text-gray-900 dark:text-gray-100">{business.phone}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Email</span><span className="text-gray-900 dark:text-gray-100">{business.email}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Plan</span><span className="text-gray-900 dark:text-gray-100 capitalize">{business.plan}</span></div>
-          <div className="flex justify-between"><span className="text-gray-500 dark:text-gray-400">Joined</span><span className="text-gray-900 dark:text-gray-100">{timeAgo(business.joinedAt)}</span></div>
+          <div className="flex gap-4"><span className="shrink-0 text-gray-500 dark:text-gray-400">Address</span><span className="ml-auto text-right text-gray-900 dark:text-gray-100">{business.address || business.location}</span></div>
         </div>
       </div>
       <div className="card p-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Description</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">{business.description}</p>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">Contact</h3>
+        <div className="space-y-3 text-sm">
+          {business.phone && <a href={`tel:${business.phone}`} className="flex items-center gap-2 text-gray-700 hover:text-brand-600 dark:text-gray-300"><Phone size={17} />{business.phone}</a>}
+          {business.whatsapp && <a href={`https://wa.me/${business.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-brand-600 dark:text-gray-300"><MessageCircle size={17} />WhatsApp</a>}
+          {business.socialLinks.instagram && <a href={`https://instagram.com/${business.socialLinks.instagram.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-brand-600 dark:text-gray-300"><Instagram size={17} />Instagram</a>}
+          {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 break-all text-gray-700 hover:text-brand-600 dark:text-gray-300"><Globe size={17} className="shrink-0" />{business.socialLinks.website}</a>}
+          <a href={`https://maps.google.com?q=${encodeURIComponent(business.address)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-gray-700 hover:text-brand-600 dark:text-gray-300"><Navigation size={17} />Directions</a>
+        </div>
+      </div>
+      <div className="card overflow-hidden">
+        <h3 className="px-4 pt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">Opening Hours</h3>
+        <div className="mt-2 divide-y divide-gray-200 dark:divide-gray-800">{business.openingHours.map((hours) => <div key={hours.day} className="flex items-center justify-between px-4 py-2.5 text-sm"><span className="text-gray-500 dark:text-gray-400">{hours.day}</span><span className={cn('font-medium', hours.closed ? 'text-error-500' : 'text-gray-900 dark:text-gray-100')}>{hours.closed ? 'Closed' : `${hours.open} - ${hours.close}`}</span></div>)}</div>
       </div>
     </div>
   );

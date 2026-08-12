@@ -179,7 +179,13 @@ export const mockPostService = {
 };
 
 export const mockDealService = {
-  async create(_businessId: string, _input: { title: string; description: string; originalPrice: number; offerPrice: number; discount: number; startsAt: string; endsAt: string; maxClaims?: number; terms?: string; ctaLabel?: string }, _file?: File): Promise<string> { void _businessId; void _input; void _file; return delay(`deal_${Date.now()}`); },
+  async create(businessId: string, input: { title: string; description: string; originalPrice: number; offerPrice: number; discount: number; startsAt: string; endsAt: string; maxClaims?: number; terms?: string; ctaLabel?: string }, file?: File): Promise<Deal> {
+    const business = businesses.find((item) => item.id === businessId);
+    if (!business) throw new Error('Business not found.');
+    const created: Deal = { id: `deal_${Date.now()}`, businessId, businessName: business.name, businessUsername: business.username, businessAvatar: business.logoUrl, businessLogo: business.logoUrl, businessCategory: business.category, title: input.title, description: input.description, mediaUrl: file ? URL.createObjectURL(file) : '', originalPrice: input.originalPrice, offerPrice: input.offerPrice, discount: input.discount, startDate: input.startsAt, endDate: input.endsAt, maxClaims: input.maxClaims ?? 0, claimedCount: 0, terms: input.terms ?? '', ctaLabel: input.ctaLabel ?? 'Claim Deal', isClaimed: false, isSaved: false, category: business.category, city: business.city, rating: business.rating, createdAt: new Date().toISOString() };
+    deals.unshift(created);
+    return delay(clone(created));
+  },
   async getAll(): Promise<Deal[]> {
     return delay(clone(deals));
   },
@@ -193,12 +199,12 @@ export const mockDealService = {
   async getTrending(): Promise<Deal[]> {
     return delay(clone([...deals].sort((a, b) => b.claimedCount - a.claimedCount)));
   },
-  async claim(id: string): Promise<Deal | null> {
+  async claim(id: string) {
     const d = deals.find((d) => d.id === id);
-    if (!d) return delay(null);
+    if (!d) throw new Error('Deal not found.');
     d.isClaimed = true;
     d.claimedCount++;
-    return delay(clone(d));
+    return delay({ deal: clone(d), claim: { id: `claim_${id}`, dealId: id, dealTitle: d.title, businessId: d.businessId, businessName: d.businessName, businessLogo: d.businessLogo, customerId: 'demo-customer', customerName: 'Demo Customer', claimCode: `DEMO-${id.toUpperCase()}`, claimedAt: new Date().toISOString(), status: 'claimed' as const } });
   },
   async toggleSave(id: string): Promise<Deal | null> {
     const d = deals.find((d) => d.id === id);

@@ -3,11 +3,9 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AppShell } from '@/components/layout/AppShell';
 import { FeedSkeleton } from '@/components/ui/States';
 import { useRole } from '@/hooks/useTheme';
-import { useAuth, type DatabaseRole, resolvePostAuthRoute } from '@/auth/AuthProvider';
+import { useAuth, type DatabaseRole } from '@/auth/AuthProvider';
 
 // ── Lazy imports ──────────────────────────────────────────────────────────────
-const LandingPage = lazy(() => import('@/pages/landing/LandingPage').then((m) => ({ default: m.LandingPage })));
-const CustomerFeed = lazy(() => import('@/pages/customer/CustomerFeed').then((m) => ({ default: m.CustomerFeed })));
 const ExplorePage = lazy(() => import('@/pages/customer/ExplorePage').then((m) => ({ default: m.ExplorePage })));
 const DealsPage = lazy(() => import('@/pages/customer/DealsPage').then((m) => ({ default: m.DealsPage })));
 const ClipsPage = lazy(() => import('@/pages/customer/ClipsPage').then((m) => ({ default: m.ClipsPage })));
@@ -20,7 +18,6 @@ const ReferralsPage = lazy(() => import('@/pages/customer/ReferralsPage').then((
 const BusinessProfile = lazy(() => import('@/pages/business/BusinessProfile').then((m) => ({ default: m.BusinessProfile })));
 const OnboardingPage = lazy(() => import('@/pages/owner/OnboardingPage').then((m) => ({ default: m.OnboardingPage })));
 const OwnerEditPage = lazy(() => import('@/pages/owner/OwnerEditPage').then((m) => ({ default: m.OwnerEditPage })));
-const OwnerHomePage = lazy(() => import('@/pages/owner/OwnerHomePage').then((m) => ({ default: m.OwnerHomePage })));
 const OwnerProfilePage = lazy(() => import('@/pages/owner/OwnerProfilePage').then((m) => ({ default: m.OwnerProfilePage })));
 const CreateContentPage = lazy(() => import('@/pages/owner/CreateContentPage').then((m) => ({ default: m.CreateContentPage })));
 const OwnerPage = lazy(() => import('@/pages/owner/OwnerPage').then((m) => ({ default: m.OwnerPage })));
@@ -47,40 +44,24 @@ function PageSkeleton() {
 
 // ── Home component ────────────────────────────────────────────────────────────
 /**
- * Smart home router. Routes the user to the right landing based on auth state
- * and owner business activation state.
- *
- * guest        → LandingPage
- * customer     → CustomerFeed
- * admin        → /admin
- * business_owner + no onboarding complete → /onboarding
- * business_owner + payment pending        → /owner/payment-pending
- * business_owner + paid/waived            → /owner/analytics
+ * Public network discovery is the Home surface for guests, customers, and
+ * owners. Authentication redirects are handled only by protected routes.
  */
 function Home() {
   const { role } = useRole();
-  const { profile, ownerBusiness, loading, isBackendMode } = useAuth();
+  const { loading, isBackendMode } = useAuth();
 
   // Non-backend (mock) mode: use legacy role switcher
   if (!isBackendMode) {
-    if (role === 'guest') return <LandingPage />;
-    if (role === 'owner') return <Navigate to="/owner/analytics" replace />;
     if (role === 'admin') return <Navigate to="/admin" replace />;
-    return <CustomerFeed />;
+    return <ExplorePage />;
   }
 
   // Backend mode with session still loading — show skeleton, not blank
   if (loading) return <PageSkeleton />;
 
-  if (role === 'guest') return <LandingPage />;
   if (role === 'admin') return <Navigate to="/admin" replace />;
-
-  if (role === 'owner') {
-    return <Navigate to={resolvePostAuthRoute(profile, ownerBusiness)} replace />;
-  }
-
-  // customer
-  return <CustomerFeed />;
+  return <ExplorePage />;
 }
 
 // ── Auth Guard ────────────────────────────────────────────────────────────────
@@ -305,7 +286,7 @@ function RoutedApp() {
               </AuthGate>
             }
           />
-          <Route path="/owner/home" element={<AuthGate roles={['business_owner']} requirePayment><OwnerHomePage /></AuthGate>} />
+          <Route path="/owner/home" element={<Navigate to="/" replace />} />
           <Route path="/owner/profile" element={<AuthGate roles={['business_owner']} requirePayment><OwnerProfilePage /></AuthGate>} />
           <Route
             path="/owner/:section"

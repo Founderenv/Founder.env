@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, Image as ImageIcon, Info, Loader2, Send } from 'lucide-react';
 import { Tabs } from '@/components/ui/Sheet';
 import { dealService, ownerService, businessService, postService, storyService, videoService } from '@/services';
@@ -15,7 +15,9 @@ const contentTypes = [
 
 export function CreateContentPage() {
   const navigate = useNavigate();
-  const [type, setType] = useState('post');
+  const [searchParams] = useSearchParams();
+  const requestedType = searchParams.get('type');
+  const [type, setType] = useState(contentTypes.some((item) => item.id === requestedType) ? requestedType! : 'post');
   const [business, setBusiness] = useState<Business | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loadingBusiness, setLoadingBusiness] = useState(true);
@@ -82,7 +84,7 @@ export function CreateContentPage() {
       return;
     }
 
-    if (!mediaFile) {
+    if (!mediaFile && type !== 'deal') {
       setNotice({ type: 'error', text: `A ${type === 'clip' ? 'video' : 'media'} file is required.` });
       return;
     }
@@ -125,10 +127,15 @@ export function CreateContentPage() {
         setMediaFile(null);
       } else if (type === 'deal') {
         if (!dealTitle.trim() || !dealDescription.trim()) throw new Error('Deal title and description are required.');
-        const orig = Number(dealOriginalPrice) || 0;
-        const offer = Number(dealOfferPrice) || 0;
+        const orig = Number(dealOriginalPrice);
+        const offer = Number(dealOfferPrice);
         const disc = Number(dealDiscount) || (orig > 0 ? Math.round(((orig - offer) / orig) * 100) : 0);
-        await dealService.create(
+        const startsAt = new Date(dealStartsAt);
+        const endsAt = new Date(dealEndsAt);
+        if (!Number.isFinite(orig) || !Number.isFinite(offer) || orig < 0 || offer < 0 || offer > orig) throw new Error('Enter valid prices; offer price cannot exceed original price.');
+        if (!Number.isFinite(disc) || disc < 0 || disc > 100) throw new Error('Discount must be between 0 and 100.');
+        if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) throw new Error('Deal end time must be after its start time.');
+        const created = await dealService.create(
           business.id,
           {
             title: dealTitle,
@@ -136,18 +143,21 @@ export function CreateContentPage() {
             originalPrice: orig,
             offerPrice: offer,
             discount: disc,
-            startsAt: new Date(dealStartsAt).toISOString(),
-            endsAt: new Date(dealEndsAt).toISOString(),
+            startsAt: startsAt.toISOString(),
+            endsAt: endsAt.toISOString(),
             maxClaims: dealMaxClaims ? Number(dealMaxClaims) : undefined,
             terms: dealTerms || undefined,
             ctaLabel: dealCtaLabel || undefined,
           },
           mediaFile || undefined
         );
-        navigate('/owner/home', { replace: true });
+        if (!created?.id) throw new Error('Deal save did not return a persisted record.');
+        setDeals((current) => [created, ...current.filter((deal) => deal.id !== created.id)]);
+        setNotice({ type: 'success', text: 'Deal saved and published.' });
         setDealTitle('');
         setDealDescription('');
         setMediaFile(null);
+        navigate(`/business/${business.username}/deals`, { replace: true, state: { notice: 'Deal saved and published.' } });
       } else if (type === 'clip') {
         if (!clipCaption.trim()) throw new Error('Clip caption is required.');
         if (!mediaFile) throw new Error('Video media file is required for Deal Clips.');
@@ -279,7 +289,7 @@ export function CreateContentPage() {
 
           <button onClick={handleCreate} disabled={saving} className="btn-primary w-full">
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            {saving ? 'Publishing...' : `Publish ${type === 'clip' ? 'Deal Clip' : type[0].toUpperCase() + type.slice(1)}`}
+            {saving ? (type === 'deal' ? 'Saving...' : 'Publishing...') : type === 'deal' ? 'Save Deal' : `Publish ${type === 'clip' ? 'Deal Clip' : type[0].toUpperCase() + type.slice(1)}`}
           </button>
         </div>
       </div>
