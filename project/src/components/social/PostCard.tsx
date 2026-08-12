@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, Bookmark, Repeat2, MoreHorizontal, MapPin, Tag } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge } from '@/components/ui/StatusBadge';
@@ -7,7 +7,8 @@ import { FollowButton } from '@/components/ui/FollowButton';
 import { ShareButton } from '@/components/ui/ShareSheet';
 import { formatNumber, timeAgo, cn } from '@/utils/format';
 import type { Post } from '@/types';
-import { postService } from '@/services';
+import { followService, postService } from '@/services';
+import { useAuth } from '@/auth/AuthProvider';
 
 interface PostCardProps {
   post: Post;
@@ -16,15 +17,56 @@ interface PostCardProps {
 
 export function PostCard({ post: initialPost, onComment }: PostCardProps) {
   const [post, setPost] = useState(initialPost);
+  const [actionError, setActionError] = useState('');
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const followPending = useRef(false);
+  const postActionPending = useRef(false);
+
+  const runCustomerAction = async (action: () => Promise<Post | null>) => {
+    if (!auth.user || auth.profile?.role !== 'customer') {
+      navigate('/auth');
+      return;
+    }
+    if (postActionPending.current) return;
+    postActionPending.current = true;
+    setActionError('');
+    try {
+      const updated = await action();
+      if (updated) setPost(updated);
+    } catch (caught: unknown) {
+      setActionError(caught instanceof Error ? caught.message : 'This action could not be completed.');
+    } finally {
+      postActionPending.current = false;
+    }
+  };
+
+  const followBusiness = async () => {
+    if (!auth.user || auth.profile?.role !== 'customer') {
+      navigate('/auth');
+      return;
+    }
+    if (followPending.current) return;
+    followPending.current = true;
+    setActionError('');
+    try {
+      await followService.follow(post.businessId, auth.user.id, auth.profile.displayName, auth.profile.avatarUrl ?? '', 'explore');
+      setPost((current) => ({ ...current, isFollowing: true }));
+    } catch (caught: unknown) {
+      setActionError(caught instanceof Error ? caught.message : 'This business could not be followed.');
+    } finally {
+      followPending.current = false;
+    }
+  };
 
   const toggleLike = () => {
-    postService.toggleLike(post.id).then((updated) => updated && setPost(updated));
+    void runCustomerAction(() => postService.toggleLike(post.id));
   };
   const toggleSave = () => {
-    postService.toggleSave(post.id).then((updated) => updated && setPost(updated));
+    void runCustomerAction(() => postService.toggleSave(post.id));
   };
   const toggleRepost = () => {
-    postService.toggleRepost(post.id).then((updated) => updated && setPost(updated));
+    void runCustomerAction(() => postService.toggleRepost(post.id));
   };
 
   return (
@@ -46,7 +88,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
         </div>
         <div className="flex items-center gap-2">
           {!post.isFollowing && (
-            <FollowButton isFollowing={post.isFollowing} onToggle={() => setPost((current) => ({ ...current, isFollowing: true }))} size="sm" />
+            <FollowButton isFollowing={post.isFollowing} onToggle={() => void followBusiness()} size="sm" />
           )}
           <button onClick={() => window.alert('Content reporting options will be submitted through the backend.')} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="More">
             <MoreHorizontal size={18} />
@@ -99,7 +141,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <ShareButton title={`${post.businessName} on Founder.env`} url={`/#/business/${post.businessUsername}`} />
+          <ShareButton title={`${post.businessName} on Founder.env`} url={`/post/${post.id}`} />
           <button onClick={toggleSave} className="no-tap" aria-label="Save">
             <Bookmark
               size={22}
@@ -113,6 +155,7 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
       </div>
 
       <div className="px-3 pb-3">
+        {actionError && <p className="mb-2 rounded-lg bg-error-50 p-2 text-xs text-error-600 dark:bg-error-500/10">{actionError}</p>}
         <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{post.caption}</p>
         {post.location && (
           <p className="mt-2 flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">

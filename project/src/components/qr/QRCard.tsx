@@ -10,7 +10,7 @@ export function QRCard({ business }: { business: Business }) {
   const target = `${window.location.origin}/q/${business.qrCode}`;
 
   const copyLink = () => {
-    navigator.clipboard?.writeText(`https://${business.shortUrl}`).then(() => {
+    navigator.clipboard?.writeText(target).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });

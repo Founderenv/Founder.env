@@ -34,6 +34,7 @@ const AuthCallbackPage = lazy(() => import('@/pages/auth/AuthPages').then((m) =>
 const ChooseRolePage = lazy(() => import('@/pages/auth/AuthPages').then((m) => ({ default: m.ChooseRolePage })));
 const CustomerDashboard = lazy(() => import('@/pages/customer/CustomerDashboard').then((m) => ({ default: m.CustomerDashboard })));
 const BusinessDashboard = lazy(() => import('@/pages/owner/BusinessDashboard').then((m) => ({ default: m.BusinessDashboard })));
+const PostDetailPage = lazy(() => import('@/pages/customer/PostDetailPage').then((m) => ({ default: m.PostDetailPage })));
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 function PageSkeleton() {
@@ -196,6 +197,7 @@ function RoutedApp() {
           <Route path="/clips" element={<ClipsPage />} />
           <Route path="/business/:username" element={<BusinessProfile />} />
           <Route path="/business/:username/deals" element={<BusinessProfile />} />
+          <Route path="/post/:postId" element={<PostDetailPage />} />
           <Route path="/q/:code" element={<QRRedirect />} />
 
           {/* Auth — customer entry */}
@@ -284,7 +286,7 @@ function RoutedApp() {
           />
 
           {/* V2 canonical merchant dashboard; V1 owner sections remain available. */}
-          <Route path="/business/dashboard" element={<AuthGate roles={['business_owner']}><BusinessDashboard /></AuthGate>} />
+          <Route path="/business/dashboard" element={<AuthGate roles={['business_owner']} requirePayment><BusinessDashboard /></AuthGate>} />
 
           {/* Business owner — dashboard routes (requirePayment enforced) */}
           <Route

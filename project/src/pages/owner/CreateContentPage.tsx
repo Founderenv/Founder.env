@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, Image as ImageIcon, Info, Loader2, Send } from 'lucide-react';
 import { Tabs } from '@/components/ui/Sheet';
@@ -20,6 +20,7 @@ export function CreateContentPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loadingBusiness, setLoadingBusiness] = useState(true);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
 
@@ -75,11 +76,18 @@ export function CreateContentPage() {
   }, []);
 
   const handleCreate = async () => {
+    if (savingRef.current) return;
     if (!business) {
       setNotice({ type: 'error', text: 'You must have an owned business profile to create content.' });
       return;
     }
 
+    if (!mediaFile) {
+      setNotice({ type: 'error', text: `A ${type === 'clip' ? 'video' : 'media'} file is required.` });
+      return;
+    }
+
+    savingRef.current = true;
     setSaving(true);
     setNotice(null);
 
@@ -159,6 +167,7 @@ export function CreateContentPage() {
     } catch (err: unknown) {
       setNotice({ type: 'error', text: (err as Error).message || 'Failed to publish content.' });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -310,20 +319,39 @@ function Select({ label, options, value, onChange }: { label: string; options: s
 }
 
 function Media({ video = false, selectedFile, onSelectFile }: { video?: boolean; selectedFile: File | null; onSelectFile: (file: File | null) => void }) {
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl('');
+      return;
+    }
+    const nextUrl = URL.createObjectURL(selectedFile);
+    setPreviewUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [selectedFile]);
+
   return (
-    <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 text-center text-gray-500 dark:border-gray-700">
+    <div className="flex min-h-36 flex-col items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-gray-200 p-4 text-center text-gray-500 dark:border-gray-700">
       <ImageIcon size={26} />
-      <span className="mt-2 text-sm font-medium">Choose {video ? 'vertical video' : 'image or video'}</span>
+      <span className="mt-2 text-sm font-medium">Choose {video ? 'vertical video' : 'image'}</span>
       {selectedFile ? (
-        <div className="mt-2 flex items-center gap-2 rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-medium dark:bg-gray-800">
-          <Check size={14} className="text-success-600" />
-          <span>{selectedFile.name}</span>
-          <button type="button" onClick={() => onSelectFile(null)} className="ml-1 text-gray-400 hover:text-gray-600">×</button>
-        </div>
+        <>
+          {selectedFile.type.startsWith('video/') ? (
+            <video src={previewUrl} controls className="mt-3 max-h-72 w-full bg-black object-contain" />
+          ) : (
+            <img src={previewUrl} alt="Upload preview" className="mt-3 max-h-72 w-full object-contain" />
+          )}
+          <div className="mt-2 flex max-w-full items-center gap-2 rounded-xl bg-gray-100 px-3 py-1.5 text-xs font-medium dark:bg-gray-800">
+            <Check size={14} className="shrink-0 text-success-600" />
+            <span className="truncate">{selectedFile.name}</span>
+            <button type="button" onClick={() => onSelectFile(null)} className="ml-1 shrink-0 text-gray-400 hover:text-gray-600" aria-label="Remove selected file">×</button>
+          </div>
+        </>
       ) : (
         <label className="btn-outline mt-3 cursor-pointer text-xs">
           Browse File
-          <input type="file" className="hidden" accept={video ? 'video/*' : 'image/*,video/*'} onChange={(e) => onSelectFile(e.target.files?.[0] ?? null)} />
+          <input type="file" className="hidden" accept={video ? 'video/*' : 'image/*'} onChange={(e) => onSelectFile(e.target.files?.[0] ?? null)} />
         </label>
       )}
     </div>

@@ -1,9 +1,10 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X } from 'lucide-react';
+import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard } from 'lucide-react';
 import { type Role } from '@/types';
 import { cn } from '@/utils/format';
 import { useState } from 'react';
+import { dataMode } from '@/lib/supabase';
 
 interface NavItem {
   to: string;
@@ -20,6 +21,7 @@ const customerNav: NavItem[] = [
 ];
 
 const ownerNav: NavItem[] = [
+  { to: '/business/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/owner/home', label: 'Home', icon: Home },
   { to: '/owner/create', label: 'Create', icon: Plus },
   { to: '/owner/profile', label: 'Profile', icon: User },
@@ -28,17 +30,26 @@ const ownerNav: NavItem[] = [
   { to: '/owner/qr', label: 'QR', icon: Menu },
 ];
 
-const ownerTools: NavItem[] = [
-  { to: '/owner/edit', label: 'Edit profile', icon: User },
+const ownerMobileNav = ownerNav.filter((item) => ['/business/dashboard', '/owner/home', '/owner/create', '/owner/profile', '/owner/analytics'].includes(item.to));
+
+const previewOwnerTools: NavItem[] = [
+  { to: '/owner/edit', label: 'Settings', icon: User },
   { to: '/owner/rewards', label: 'Rewards', icon: Tag },
   { to: '/owner/loyalty', label: 'Loyalty', icon: BarChart3 },
   { to: '/owner/referrals', label: 'Referrals', icon: Compass },
   { to: '/owner/subscription', label: 'Subscription', icon: Menu },
 ];
 
+const ownerTools: NavItem[] = dataMode === 'supabase'
+  ? [
+      { to: '/owner/edit', label: 'Settings', icon: User },
+      { to: '/owner/subscription', label: 'Subscription', icon: Menu },
+    ]
+  : previewOwnerTools;
+
 export function MobileNavigation({ role }: { role: Role }) {
   const location = useLocation();
-  const nav = role === 'owner' ? ownerNav : customerNav;
+  const nav = role === 'owner' ? ownerMobileNav : customerNav;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-gray-200 bg-white/95 backdrop-blur-lg dark:border-gray-800 dark:bg-gray-950/95 lg:hidden">

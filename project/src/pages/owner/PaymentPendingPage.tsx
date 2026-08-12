@@ -63,9 +63,9 @@ function PendingPayment({
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
           <CreditCard size={28} />
         </div>
-        <h1 className="mt-4 text-2xl font-bold">Payment Required</h1>
+        <h1 className="mt-4 text-2xl font-bold">Early Access Review</h1>
         <p className="mt-1 text-sm text-brand-200">
-          Activate your business profile on Founder.env
+          Your business profile is saved and awaiting manual activation
         </p>
       </div>
 
@@ -78,15 +78,10 @@ function PendingPayment({
           </div>
         )}
 
-        {/* Pricing card */}
+        {/* Early Access scope */}
         <div className="rounded-2xl border-2 border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="font-semibold text-brand-900 dark:text-brand-200">Founder.env Business</p>
-              <p className="mt-0.5 text-sm text-brand-700/70 dark:text-brand-400/70">One-time activation fee</p>
-            </div>
-            <p className="text-3xl font-bold text-brand-700 dark:text-brand-400">₹599</p>
-          </div>
+          <p className="font-semibold text-brand-900 dark:text-brand-200">Founder.env Early Access</p>
+          <p className="mt-0.5 text-sm text-brand-700/70 dark:text-brand-400/70">No online payment is requested while payment processing is being completed.</p>
 
           <div className="mt-4 space-y-2">
             {[
@@ -105,16 +100,16 @@ function PendingPayment({
           </div>
         </div>
 
-        {/* Payment coming soon notice */}
+        {/* Payment status notice */}
         <div className="mt-5 flex items-start gap-3 rounded-xl bg-amber-50 p-4 dark:bg-amber-500/10">
           <Clock size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
           <div>
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Payment integration coming soon
+              Manual activation in progress
             </p>
             <p className="mt-0.5 text-xs text-amber-700/80 dark:text-amber-400/70">
-              We're setting up Razorpay. You'll receive an email at{' '}
-              <strong>{profile?.email ?? 'your registered email'}</strong> once payment is live.
+              The Founder.env team will review this pilot profile and contact{' '}
+              <strong>{profile?.email ?? 'your registered email'}</strong> when Early Access is activated.
             </p>
           </div>
         </div>

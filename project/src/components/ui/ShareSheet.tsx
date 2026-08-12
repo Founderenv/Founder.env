@@ -12,18 +12,19 @@ interface ShareSheetProps {
 
 export function ShareSheet({ open, onClose, title, url }: ShareSheetProps) {
   const [copied, setCopied] = useState(false);
+  const shareUrl = new URL(url, window.location.origin).href;
 
   const copyLink = () => {
-    navigator.clipboard?.writeText(url).then(() => {
+    navigator.clipboard?.writeText(shareUrl).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
   const shareOptions: { label: string; icon: ReactNode; color: string; action: () => void }[] = [
-    { label: 'WhatsApp', icon: <MessageCircle size={20} />, color: 'text-success-600', action: () => window.open(`https://wa.me/?text=${encodeURIComponent(title + ' ' + url)}`) },
-    { label: 'Telegram', icon: <Send size={20} />, color: 'text-blue-500', action: () => window.open(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(title)}`) },
-    { label: 'Facebook', icon: <Facebook size={20} />, color: 'text-blue-600', action: () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`) },
+    { label: 'WhatsApp', icon: <MessageCircle size={20} />, color: 'text-success-600', action: () => window.open(`https://wa.me/?text=${encodeURIComponent(title + ' ' + shareUrl)}`) },
+    { label: 'Telegram', icon: <Send size={20} />, color: 'text-blue-500', action: () => window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(title)}`) },
+    { label: 'Facebook', icon: <Facebook size={20} />, color: 'text-blue-600', action: () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`) },
   ];
 
   return (
@@ -44,7 +45,7 @@ export function ShareSheet({ open, onClose, title, url }: ShareSheetProps) {
         <div className="flex items-center gap-2 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
           <Link2 size={18} className="shrink-0 text-gray-400" />
           <input
-            value={url}
+            value={shareUrl}
             readOnly
             className="flex-1 bg-transparent text-sm text-gray-600 dark:text-gray-400 outline-none"
           />

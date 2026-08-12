@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { MapPin, Phone, MessageCircle, Star, Edit, Plus, BarChart3, QrCode, Instagram, Globe, Navigation, ChevronLeft } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
@@ -48,6 +48,8 @@ export function BusinessProfile() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [requestingBill, setRequestingBill] = useState(false);
+  const billRequestPending = useRef(false);
 
   const activeUserId = dataMode === 'supabase' ? auth.user?.id : currentCustomer.id;
   const isOwner = role === 'owner' && (dataMode === 'mock' || business?.ownerId === activeUserId);
@@ -62,7 +64,9 @@ export function BusinessProfile() {
       dealService.getByBusiness(business.id),
       reviewService.getByBusiness(business.id),
       videoService.getByBusiness(business.id),
-      followService.isFollowing(business.id, activeUserId ?? currentCustomer.id),
+      auth.profile?.role === 'customer' && activeUserId
+        ? followService.isFollowing(business.id, activeUserId)
+        : Promise.resolve(false),
     ]).then(([s, h, p, d, r, v, following]) => {
       setStories(s);
       setHighlights(h);
@@ -73,7 +77,7 @@ export function BusinessProfile() {
       setIsFollowing(following);
       setDataLoaded(true);
     });
-  }, [business, currentCustomer.id, activeUserId]);
+  }, [business, currentCustomer.id, activeUserId, auth.profile?.role]);
 
   if (loading) return <div className="max-w-2xl mx-auto"><ProfileSkeleton /></div>;
   if (error || !business) return <ErrorState title="Business unavailable" description={error || 'This business could not be found.'} />;
@@ -90,12 +94,21 @@ export function BusinessProfile() {
     }
   };
 
-  const handleRequestBill = () => {
+  const handleRequestBill = async () => {
     if (!auth.user || auth.profile?.role !== 'customer') { navigate('/auth'); return; }
     if (!isFollowing) return;
-    founderV2Service.requestBill(business.id)
-      .then(() => window.alert('Bill requested. The business can now add your digital bill.'))
-      .catch((caught: unknown) => window.alert(caught instanceof Error ? caught.message : 'Could not request a bill.'));
+    if (billRequestPending.current) return;
+    billRequestPending.current = true;
+    setRequestingBill(true);
+    try {
+      await founderV2Service.requestBill(business.id);
+      window.alert('Bill requested. The business can now add your digital bill.');
+    } catch (caught: unknown) {
+      window.alert(caught instanceof Error ? caught.message : 'Could not request a bill.');
+    } finally {
+      billRequestPending.current = false;
+      setRequestingBill(false);
+    }
   };
 
   return (
@@ -108,7 +121,7 @@ export function BusinessProfile() {
           <ChevronLeft size={20} />
         </Link>
         <div className="absolute top-3 right-3 flex gap-2">
-          <ShareButton title={business.name} url={`/#/business/${business.username}`} className="rounded-xl bg-white/90 backdrop-blur-sm hover:bg-white" />
+          <ShareButton title={business.name} url={`/business/${business.username}`} className="rounded-xl bg-white/90 backdrop-blur-sm hover:bg-white" />
         </div>
       </div>
 
@@ -126,7 +139,7 @@ export function BusinessProfile() {
             ) : (
               <>
                 <FollowButton isFollowing={isFollowing} onToggle={handleFollow} size="sm" />
-                {dataMode === 'supabase' && auth.profile?.role === 'customer' && <button type="button" className="btn-primary text-xs px-3 py-2" disabled={!isFollowing} onClick={handleRequestBill}>Request Bill</button>}
+                {dataMode === 'supabase' && auth.profile?.role === 'customer' && <button type="button" className="btn-primary text-xs px-3 py-2" disabled={!isFollowing || requestingBill} onClick={() => void handleRequestBill()}>{requestingBill ? 'Requesting...' : 'Request Bill'}</button>}
                 <Link to="/messages" className="btn-outline text-xs px-3 py-2"><MessageCircle size={14} /> Message</Link>
               </>
             )}
