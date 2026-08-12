@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { LoaderCircle, LockKeyhole, Store, User, AlertCircle } from 'lucide-react';
-import { useAuth, type DatabaseRole, consumeOAuthRoleIntent, resolvePostAuthRoute } from '@/auth/AuthProvider';
+import { useAuth, consumeOAuthRoleIntent, resolvePostAuthRoute } from '@/auth/AuthProvider';
 import { Logo } from '@/components/layout/Navigation';
 import { dataMode, supabase } from '@/lib/supabase';
 
