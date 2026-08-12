@@ -119,7 +119,7 @@ export function BusinessProfile() {
           <div className="flex w-full flex-wrap gap-2 pb-1 sm:w-auto sm:max-w-none sm:justify-end">
             {isOwner ? (
               <>
-                <Link to="/owner/edit" className="btn-outline text-xs px-3 py-2"><Edit size={14} /> Edit</Link>
+                <Link to="/owner/edit" className="btn-outline text-xs px-3 py-2"><Edit size={14} /> Edit Profile</Link>
                 <Link to="/owner/qr" className="btn-outline text-xs px-3 py-2"><QrCode size={14} /> QR</Link>
                 <Link to="/owner/analytics" className="btn-outline text-xs px-3 py-2"><BarChart3 size={14} /> Analytics</Link>
               </>

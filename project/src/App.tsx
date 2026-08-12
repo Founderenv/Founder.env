@@ -20,6 +20,8 @@ const ReferralsPage = lazy(() => import('@/pages/customer/ReferralsPage').then((
 const BusinessProfile = lazy(() => import('@/pages/business/BusinessProfile').then((m) => ({ default: m.BusinessProfile })));
 const OnboardingPage = lazy(() => import('@/pages/owner/OnboardingPage').then((m) => ({ default: m.OnboardingPage })));
 const OwnerEditPage = lazy(() => import('@/pages/owner/OwnerEditPage').then((m) => ({ default: m.OwnerEditPage })));
+const OwnerHomePage = lazy(() => import('@/pages/owner/OwnerHomePage').then((m) => ({ default: m.OwnerHomePage })));
+const OwnerProfilePage = lazy(() => import('@/pages/owner/OwnerProfilePage').then((m) => ({ default: m.OwnerProfilePage })));
 const CreateContentPage = lazy(() => import('@/pages/owner/CreateContentPage').then((m) => ({ default: m.CreateContentPage })));
 const OwnerPage = lazy(() => import('@/pages/owner/OwnerPage').then((m) => ({ default: m.OwnerPage })));
 const PaymentPendingPage = lazy(() => import('@/pages/owner/PaymentPendingPage').then((m) => ({ default: m.PaymentPendingPage })));
@@ -301,6 +303,8 @@ function RoutedApp() {
               </AuthGate>
             }
           />
+          <Route path="/owner/home" element={<AuthGate roles={['business_owner']} requirePayment><OwnerHomePage /></AuthGate>} />
+          <Route path="/owner/profile" element={<AuthGate roles={['business_owner']} requirePayment><OwnerProfilePage /></AuthGate>} />
           <Route
             path="/owner/:section"
             element={

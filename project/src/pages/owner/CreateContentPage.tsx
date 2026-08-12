@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Check, Image as ImageIcon, Info, Loader2, Send } from 'lucide-react';
 import { Tabs } from '@/components/ui/Sheet';
 import { dealService, ownerService, businessService, postService, storyService, videoService } from '@/services';
@@ -13,6 +14,7 @@ const contentTypes = [
 ];
 
 export function CreateContentPage() {
+  const navigate = useNavigate();
   const [type, setType] = useState('post');
   const [business, setBusiness] = useState<Business | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -98,7 +100,7 @@ export function CreateContentPage() {
           },
           mediaFile || undefined
         );
-        setNotice({ type: 'success', text: 'Post published successfully!' });
+        navigate('/owner/home', { replace: true });
         setPostCaption('');
         setMediaFile(null);
       } else if (type === 'story') {
@@ -110,7 +112,7 @@ export function CreateContentPage() {
           },
           mediaFile || undefined
         );
-        setNotice({ type: 'success', text: 'Story published successfully!' });
+        navigate('/owner/home', { replace: true });
         setStoryCaption('');
         setMediaFile(null);
       } else if (type === 'deal') {
@@ -134,7 +136,7 @@ export function CreateContentPage() {
           },
           mediaFile || undefined
         );
-        setNotice({ type: 'success', text: 'Deal published successfully!' });
+        navigate('/owner/home', { replace: true });
         setDealTitle('');
         setDealDescription('');
         setMediaFile(null);
@@ -150,7 +152,7 @@ export function CreateContentPage() {
           },
           mediaFile
         );
-        setNotice({ type: 'success', text: 'Deal Clip published successfully!' });
+        navigate('/owner/home', { replace: true });
         setClipCaption('');
         setMediaFile(null);
       }

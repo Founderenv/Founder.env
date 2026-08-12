@@ -20,8 +20,9 @@ const customerNav: NavItem[] = [
 ];
 
 const ownerNav: NavItem[] = [
-  { to: '/owner/analytics', label: 'Home', icon: Home },
+  { to: '/owner/home', label: 'Home', icon: Home },
   { to: '/owner/create', label: 'Create', icon: Plus },
+  { to: '/owner/profile', label: 'Profile', icon: User },
   { to: '/messages', label: 'Messages', icon: MessageCircle },
   { to: '/owner/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/owner/qr', label: 'QR', icon: Menu },
