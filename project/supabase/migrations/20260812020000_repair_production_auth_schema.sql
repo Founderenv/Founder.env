@@ -405,16 +405,16 @@ where public.is_admin();
 -- ============================================================================
 -- 8. ROW LEVEL SECURITY & POLICIES (100% Fail-Safe Wrapped Policy Blocks)
 -- ============================================================================
-do $$ declare table_name text; begin
-  foreach table_name in array array[
+do $$ declare rls_table_name text; begin
+  foreach rls_table_name in array array[
     'profiles','business_templates','businesses','business_gallery','business_followers','posts','post_media','post_likes','post_comments','saved_posts','reposts',
     'deals','deal_claims','saved_deals','stories','story_views','story_highlights','story_highlight_items','deal_clips','deal_clip_likes','saved_deal_clips',
     'reviews','review_replies','review_helpful','conversations','messages','notifications','qr_codes','qr_scans','reward_campaigns','reward_claims',
     'scratch_campaigns','scratch_plays','referral_campaigns','referrals','loyalty_programs','loyalty_members','loyalty_transactions','subscriptions',
     'payments','invoices','reports','analytics_events','admin_audit_logs'
   ] loop
-    if exists (select 1 from information_schema.tables where table_schema = 'public' and table_name = table_name) then
-      execute format('alter table public.%I enable row level security', table_name);
+    if exists (select 1 from information_schema.tables as t where t.table_schema = 'public' and t.table_name = rls_table_name) then
+      execute format('alter table public.%I enable row level security', rls_table_name);
     end if;
   end loop;
 end $$;
