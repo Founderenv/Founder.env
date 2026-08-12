@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
+import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { MapPin, Phone, MessageCircle, Star, Edit, Plus, BarChart3, QrCode, Instagram, Globe, Navigation, ChevronLeft } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge, StatusBadge } from '@/components/ui/StatusBadge';
@@ -22,11 +22,15 @@ import { useBusiness } from '@/hooks/useBusiness';
 import { storyService, postService, dealService, reviewService, videoService, followService } from '@/services';
 import { useCurrentCustomer } from '@/hooks/useCurrentCustomer';
 import { dataMode } from '@/lib/supabase';
+import { useAuth } from '@/auth/AuthProvider';
+import { founderV2Service } from '@/services/v2Service';
 import { formatNumber, cn, timeAgo } from '@/utils/format';
 import type { Story, Post, Deal, Review, VideoClip, StoryHighlight } from '@/types';
 
 export function BusinessProfile() {
   const currentCustomer = useCurrentCustomer();
+  const auth = useAuth();
+  const navigate = useNavigate();
   const { username } = useParams<{ username: string }>();
   const location = useLocation();
   const { business, loading, error } = useBusiness(username);
@@ -45,7 +49,8 @@ export function BusinessProfile() {
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  const isOwner = role === 'owner' && (dataMode === 'mock' || business?.ownerId === currentCustomer.id);
+  const activeUserId = dataMode === 'supabase' ? auth.user?.id : currentCustomer.id;
+  const isOwner = role === 'owner' && (dataMode === 'mock' || business?.ownerId === activeUserId);
 
   useEffect(() => {
     if (!business) return;
@@ -57,7 +62,7 @@ export function BusinessProfile() {
       dealService.getByBusiness(business.id),
       reviewService.getByBusiness(business.id),
       videoService.getByBusiness(business.id),
-      followService.isFollowing(business.id, currentCustomer.id),
+      followService.isFollowing(business.id, activeUserId ?? currentCustomer.id),
     ]).then(([s, h, p, d, r, v, following]) => {
       setStories(s);
       setHighlights(h);
@@ -68,17 +73,29 @@ export function BusinessProfile() {
       setIsFollowing(following);
       setDataLoaded(true);
     });
-  }, [business, currentCustomer.id]);
+  }, [business, currentCustomer.id, activeUserId]);
 
   if (loading) return <div className="max-w-2xl mx-auto"><ProfileSkeleton /></div>;
   if (error || !business) return <ErrorState title="Business unavailable" description={error || 'This business could not be found.'} />;
 
   const handleFollow = () => {
+    if (dataMode === 'supabase' && (!auth.user || auth.profile?.role !== 'customer')) {
+      navigate('/auth');
+      return;
+    }
     if (isFollowing) {
       followService.unfollow(business.id, currentCustomer.id).then(() => setIsFollowing(false));
     } else {
       followService.follow(business.id, currentCustomer.id, currentCustomer.displayName, currentCustomer.avatarUrl, 'profile').then(() => setIsFollowing(true));
     }
+  };
+
+  const handleRequestBill = () => {
+    if (!auth.user || auth.profile?.role !== 'customer') { navigate('/auth'); return; }
+    if (!isFollowing) return;
+    founderV2Service.requestBill(business.id)
+      .then(() => window.alert('Bill requested. The business can now add your digital bill.'))
+      .catch((caught: unknown) => window.alert(caught instanceof Error ? caught.message : 'Could not request a bill.'));
   };
 
   return (
@@ -109,6 +126,7 @@ export function BusinessProfile() {
             ) : (
               <>
                 <FollowButton isFollowing={isFollowing} onToggle={handleFollow} size="sm" />
+                {dataMode === 'supabase' && auth.profile?.role === 'customer' && <button type="button" className="btn-primary text-xs px-3 py-2" disabled={!isFollowing} onClick={handleRequestBill}>Request Bill</button>}
                 <Link to="/messages" className="btn-outline text-xs px-3 py-2"><MessageCircle size={14} /> Message</Link>
               </>
             )}

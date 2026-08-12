@@ -88,14 +88,14 @@ export function resolvePostAuthRoute(
 ): string {
   if (!profile) return '/auth';
   if (profile.role === 'admin') return '/admin';
-  if (profile.role === 'customer') return '/';
+  if (profile.role === 'customer') return '/customer';
   if (profile.role === 'business_owner') {
     if (!profile.onboardingComplete) return '/onboarding';
     if (!ownerBusiness) return '/onboarding';
     if (ownerBusiness.paymentGate === 'pending' || ownerBusiness.paymentGate === 'suspended') {
       return '/owner/payment-pending';
     }
-    return '/owner/analytics';
+    return '/business/dashboard';
   }
   return '/';
 }
