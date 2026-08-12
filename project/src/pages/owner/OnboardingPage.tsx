@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, CreditCard, Image as ImageIcon, MapPin, Store, Loader2 } from 'lucide-react';
 import { businessService, categoryService, templateService } from '@/services';
@@ -31,6 +31,7 @@ export function OnboardingPage() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [draft, setDraft] = useState<Draft>(
@@ -77,11 +78,13 @@ export function OnboardingPage() {
   const selectedTemplate = templates.find((item) => item.id === draft.template) ?? templates[0];
 
   const handleSaveBusiness = async () => {
+    if (savingRef.current) return;
     if (!draft.name.trim() || !draft.username.trim()) {
       setStatusMessage({ type: 'error', text: 'Business name and username are required.' });
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
     setStatusMessage(null);
     try {
@@ -112,10 +115,11 @@ export function OnboardingPage() {
         type: 'success',
         text: 'Business profile saved! Opening your dashboard…',
       });
-      setTimeout(() => navigate('/business/dashboard'), 1500);
+      navigate('/business/dashboard', { replace: true });
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: (err as Error).message || 'Failed to save business profile.' });
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

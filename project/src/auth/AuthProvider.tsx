@@ -52,7 +52,7 @@ interface AuthContextValue {
   signInWithPassword: (email: string, password: string) => Promise<AuthCompletion>;
   signUpWithPassword: (email: string, password: string, displayName: string, requestedRole: Exclude<DatabaseRole, 'admin'>) => Promise<AuthCompletion>;
   chooseRole: (role: Exclude<DatabaseRole, 'admin'>) => Promise<void>;
-  completeBusinessOnboarding: () => Promise<void>;
+  completeBusinessOnboarding: () => Promise<AuthCompletion>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<AuthCompletion>;
 }
@@ -236,7 +236,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!supabase) throw new Error('Supabase is not configured.');
       const { error } = await supabase.rpc('complete_business_onboarding');
       if (error) throw error;
-      await loadProfile(session?.user.id);
+      const next = await loadProfile(session?.user.id);
+      const completion = {
+        destination: next.profile ? resolvePostAuthRoute(next.profile, next.ownerBusiness) : null,
+        emailConfirmationRequired: false,
+        ...next,
+      };
+      if (completion.destination !== '/business/dashboard') {
+        throw new Error('Business setup could not be confirmed. Please try again.');
+      }
+      return completion;
     },
 
     signOut: async () => {
