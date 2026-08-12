@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { LoaderCircle, LockKeyhole, Store, User, AlertCircle } from 'lucide-react';
 import { useAuth, consumeOAuthRoleIntent, resolvePostAuthRoute } from '@/auth/AuthProvider';
@@ -22,6 +22,7 @@ export function AuthPage() {
   const [error, setError] = useState('');
   const [confirmationRequired, setConfirmationRequired] = useState(false);
   const [busy, setBusy] = useState(false);
+  const submittingRef = useRef(false);
 
   // Already authenticated → route using trusted post-auth resolver
   if (auth.loading) return <CenteredLoading label="Restoring your session…" />;
@@ -31,6 +32,8 @@ export function AuthPage() {
   if (dataMode !== 'supabase') return <AuthUnavailable />;
 
   const submit = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setBusy(true);
     try {
@@ -46,6 +49,7 @@ export function AuthPage() {
     } catch (caught) {
       setError(authErrorMessage(caught));
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   };
@@ -162,6 +166,7 @@ export function BusinessAuthPage() {
   const [error, setError] = useState('');
   const [confirmationRequired, setConfirmationRequired] = useState(false);
   const [busy, setBusy] = useState(false);
+  const submittingRef = useRef(false);
 
   // Already authenticated → route using trusted post-auth resolver
   if (auth.loading) return <CenteredLoading label="Restoring your session…" />;
@@ -193,6 +198,8 @@ export function BusinessAuthPage() {
   if (dataMode !== 'supabase') return <AuthUnavailable />;
 
   const submit = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError('');
     setBusy(true);
     try {
@@ -213,6 +220,7 @@ export function BusinessAuthPage() {
     } catch (caught) {
       setError(authErrorMessage(caught));
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   };
@@ -368,7 +376,9 @@ export function AuthCallbackPage() {
         // Consume stored role intent from sessionStorage
         const intent = consumeOAuthRoleIntent();
 
-        if (!auth.profile?.onboardingComplete) {
+        // A role intent is only for a newly-created OAuth profile. Never let
+        // the entry page change an existing unfinished owner's stored role.
+        if (!auth.profile?.onboardingComplete && auth.profile?.role === 'customer') {
           if (intent) {
             await auth.chooseRole(intent);
           } else {
