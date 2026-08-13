@@ -26,7 +26,7 @@ Deno.serve(async(request)=>{
       target_prompt:prompt,target_generation_type:generationType,target_request_id:requestId,
     });
     if(reserveError){
-      if(reserveError.message.includes('daily_generation_limit_reached'))return json({error:"You've created today's free post.",code:'DAILY_LIMIT'},429);
+      if(reserveError.message.includes('daily_generation_limit_reached'))return json({error:"You've used today's 5 free creations.",code:'DAILY_LIMIT'},429);
       throw new Error(reserveError.message);
     }
     reservationId=stringValue(reservation?.id);
@@ -45,7 +45,7 @@ Deno.serve(async(request)=>{
     const input={prompt,type:generationType,dateIso,dateLabel,weekday,business:context};
     const content=await providers.text.generateContent(input);
     const creative=await providers.creative.generateCreativeBackground({...input,content});
-    const rendererData={businessName:context.name,logoUrl:context.logoUrl,headline:content.headline,supportingText:content.supportingText,cta:content.cta,offer:context.todayOffer,address:context.address,location:context.city||context.location,phone:context.phone,whatsapp:context.whatsapp,website:context.website,dateLabel};
+    const rendererData={businessName:context.name,logoUrl:context.logoUrl,heroImageUrl:context.coverUrl,category:context.category,headline:content.headline,eyebrow:content.eyebrow,supportingText:content.supportingText,cta:content.cta,offer:context.todayOffer,address:context.address,location:context.city||context.location,phone:context.phone,whatsapp:context.whatsapp,website:context.website,instagram:context.instagram,dateLabel};
     const{data:completed,error:completeError}=await admin.rpc('complete_ai_content_generation',{
       target_generation_id:reservationId,target_caption:content.caption,target_headline:content.headline,
       target_supporting_text:content.supportingText,target_cta:content.cta,target_creative_spec:creative,

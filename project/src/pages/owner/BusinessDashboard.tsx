@@ -1,7 +1,6 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Coins, ReceiptText, Users, WandSparkles } from 'lucide-react';
-import { AIOrb } from '@/components/ai/AIOrb';
+import { useSearchParams } from 'react-router-dom';
+import { Coins, ReceiptText, Users } from 'lucide-react';
 import { founderV2Service, type BillRequest, type FounderBill } from '@/services/v2Service';
 import { formatCurrency } from '@/utils/format';
 import { useAuth } from '@/auth/AuthProvider';
@@ -42,7 +41,6 @@ export function BusinessDashboard() {
   };
   const paid = bills.filter((item) => item.paymentStatus === 'paid'); const sales = paid.reduce((sum,item) => sum + item.finalAmount,0);
   return <div className="mx-auto max-w-content pb-10"><p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Business network</p><h1 className="mt-1 text-2xl font-bold">Founder dashboard</h1>{error && <p className="mt-3 rounded-xl bg-error-50 p-3 text-sm text-error-600">{error}</p>}
-    <Link to="/owner/ai-content" className="group relative mt-5 flex min-h-36 items-center justify-between overflow-hidden rounded-3xl bg-[#06100c] p-6 text-white shadow-xl"><div className="relative z-10 max-w-lg"><p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-brand-300"><WandSparkles size={14}/>AI Content Studio</p><h2 className="mt-2 text-2xl font-bold">Create today's business post</h2><p className="mt-2 text-sm text-white/55">Your AI uses your saved business details to design a ready-to-share poster and caption.</p><span className="mt-4 inline-flex text-sm font-semibold text-brand-300 group-hover:text-brand-200">Start creating →</span></div><AIOrb compact/></Link>
     <div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric icon={Users} label="Bill requests" value={String(requests.length)} /><Metric icon={ReceiptText} label="Paid bills" value={String(paid.length)} /><Metric icon={Coins} label="Founder sales" value={formatCurrency(sales)} /></div>
     <div className="mt-6"><FECoinWallet wallet={wallet} title="Business FE Coins" /></div>
     <section className="card mt-6 p-5"><h2 className="font-semibold">Bill requests</h2><p className="text-sm text-gray-500">Create a bill from a customer request; benefits are calculated by the database.</p><div className="mt-4 space-y-3">{requests.length === 0 ? <p className="text-sm text-gray-500">No pending bill requests.</p> : requests.map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl border border-gray-100 p-4 dark:border-gray-800"><div><p className="font-medium">Customer request</p><p className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleString()}</p></div><button className="btn-primary text-sm" onClick={() => setSelected(item)}>Add bill</button></div>)}</div></section>

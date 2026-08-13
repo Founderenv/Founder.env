@@ -32,6 +32,8 @@ export interface CreativeSpec {
   mood: string;
   composition: string;
   decorativeStyle: string;
+  layout?: 'offer' | 'product' | 'festival' | 'daily' | 'announcement';
+  variant?: number;
 }
 
 export interface ContentDraft {
@@ -39,6 +41,7 @@ export interface ContentDraft {
   headline: string;
   supportingText: string;
   cta: string;
+  eyebrow: string;
 }
 
 export interface GenerationInput {
