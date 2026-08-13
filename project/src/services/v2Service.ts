@@ -10,6 +10,9 @@ export interface FounderBill {
   coinDiscount: number; finalAmount: number; status: string; paymentStatus: string; createdAt: string; description?: string | null;
   businessName?: string; invoiceNumber?: string | null;
 }
+export interface BenefitSettings { businessId:string; enabled:boolean; percentage:number; minimumBill:number; maximumBenefit:number; redemptionPercent:number; customerEarnRate:number; businessEarnRate:number; }
+export interface MerchantPaymentSettings { businessId:string; merchantUpi:string; payeeName:string; enabled:boolean; }
+export interface MerchantPaymentAttempt { id:string; billId:string; customerId:string; businessId:string; customerName:string; originalAmount:number; founderBenefit:number; feDiscount:number; expectedFinalAmount:number; merchantUpi:string; payeeName:string; reference:string; status:'initiated'|'awaiting_confirmation'|'verified'|'not_received'|'failed'; createdAt:string; }
 export interface BillRequest { id: string; businessId: string; customerId: string; status: string; createdAt: string; }
 export interface Relationship { paidBills: number; totalSpend: number; totalSavings: number; coinsEarned: number; loyaltyLevel: string; }
 export interface CoinTransaction { id: string; type: string; amount: number; description: string; createdAt: string; }
@@ -17,11 +20,13 @@ export interface CoinWallet { balance: number; earned: number; redeemed: number;
 
 function bill(row: Row): FounderBill { const business = (row.businesses ?? {}) as Row; return { id:String(row.id), businessId:String(row.business_id), customerId:String(row.customer_id), originalAmount:number(row.original_amount), memberDiscount:number(row.member_discount), coinDiscount:number(row.fe_coin_discount), finalAmount:number(row.final_amount), status:String(row.status), paymentStatus:String(row.payment_status), createdAt:String(row.created_at), description:typeof row.description === 'string' ? row.description : null, businessName:typeof business.name === 'string' ? business.name : undefined, invoiceNumber:typeof row.invoice_number === 'string' ? row.invoice_number : null }; }
 function request(row: Row): BillRequest { return { id:String(row.id), businessId:String(row.business_id), customerId:String(row.customer_id), status:String(row.status), createdAt:String(row.created_at) }; }
+function attempt(row:Row):MerchantPaymentAttempt{return{id:String(row.id),billId:String(row.bill_id),customerId:String(row.customer_id),businessId:String(row.business_id),customerName:String(row.customer_display_name),originalAmount:number(row.original_amount),founderBenefit:number(row.founder_benefit),feDiscount:number(row.fe_discount),expectedFinalAmount:number(row.expected_final_amount),merchantUpi:String(row.merchant_upi),payeeName:String(row.payee_name),reference:String(row.unique_reference),status:String(row.status) as MerchantPaymentAttempt['status'],createdAt:String(row.created_at)};}
+function benefit(row:Row):BenefitSettings{return{businessId:String(row.business_id),enabled:Boolean(row.enabled),percentage:number(row.member_discount_value),minimumBill:number(row.minimum_bill),maximumBenefit:number(row.maximum_discount),redemptionPercent:number(row.max_fe_coin_redemption_percent),customerEarnRate:number(row.customer_coin_rate),businessEarnRate:number(row.merchant_coin_rate)};}
 
 export const founderV2Service = {
   async requestBill(businessId: string) { const { data, error } = await requireSupabase().rpc('request_bill', { target_business_id: businessId }); if (error) throw error; return request(data as Row); },
   async createBill(requestId: string, input: { amount: number; description?: string; invoiceNumber?: string; note?: string; coinDiscount?: number }) {
-    const { data, error } = await requireSupabase().rpc('owner_create_bill', { target_request_id: requestId, amount: input.amount, bill_description: input.description ?? null, invoice_ref: input.invoiceNumber ?? null, bill_note: input.note ?? null, requested_coin_discount: input.coinDiscount ?? 0 });
+    const { data, error } = await requireSupabase().rpc('owner_create_bill', { target_request_id: requestId, amount: input.amount, bill_description: input.description ?? null, invoice_ref: input.invoiceNumber ?? null, bill_note: input.note ?? null, requested_coin_discount: 0 });
     if (error) throw error; return bill(data as Row);
   },
   async getMyBills(businessId?: string) { const customerId=await currentUserId();let query = requireSupabase().from('bills').select('*, businesses(name)').eq('customer_id',customerId).order('created_at', { ascending: false }); if (businessId) query = query.eq('business_id', businessId); const { data, error } = await query; if (error) throw error; return rows(data).map(bill); },
@@ -31,10 +36,18 @@ export const founderV2Service = {
   async getCoinBalance() { return (await this.getCoinWallet()).balance; },
   async getOwnerRequests(businessId:string) { const { data, error } = await requireSupabase().from('bill_requests').select('*').eq('business_id',businessId).eq('status','pending').order('created_at', { ascending: false }); if (error) throw error; return rows(data).map(request); },
   async getOwnerBills(businessId:string) { const { data, error } = await requireSupabase().from('bills').select('*, businesses(name)').eq('business_id',businessId).order('created_at', { ascending: false }); if (error) throw error; return rows(data).map(bill); },
+  async getBenefitSettings(businessId:string){const{data,error}=await requireSupabase().from('business_reward_settings').select('*').eq('business_id',businessId).maybeSingle();if(error)throw error;return data?benefit(data as Row):null;},
+  async saveBenefitSettings(value:BenefitSettings){const{data,error}=await requireSupabase().rpc('save_founder_benefit_settings',{target_business_id:value.businessId,target_enabled:value.enabled,target_percentage:value.percentage,target_minimum:value.minimumBill,target_maximum:value.maximumBenefit,target_redemption_percent:value.redemptionPercent,target_customer_rate:value.customerEarnRate,target_business_rate:value.businessEarnRate});if(error)throw error;return benefit(data as Row);},
+  async getMerchantSettings(businessId:string){const{data,error}=await requireSupabase().from('merchant_payment_settings').select('*').eq('business_id',businessId).maybeSingle();if(error)throw error;if(!data)return null;const row=data as Row;return{businessId:String(row.business_id),merchantUpi:String(row.merchant_upi),payeeName:String(row.payee_name),enabled:Boolean(row.enabled)} as MerchantPaymentSettings;},
+  async saveMerchantSettings(value:MerchantPaymentSettings){const{data,error}=await requireSupabase().rpc('save_merchant_upi_settings',{target_business_id:value.businessId,target_upi:value.merchantUpi,target_payee_name:value.payeeName});if(error)throw error;const row=data as Row;return{businessId:String(row.business_id),merchantUpi:String(row.merchant_upi),payeeName:String(row.payee_name),enabled:Boolean(row.enabled)} as MerchantPaymentSettings;},
+  async getOwnerPaymentAttempts(businessId:string){const{data,error}=await requireSupabase().from('merchant_payment_attempts').select('*').eq('business_id',businessId).order('created_at',{ascending:false}).limit(30);if(error)throw error;return rows(data).map(attempt);},
+  async confirmMerchantPayment(id:string){const{data,error}=await requireSupabase().rpc('owner_confirm_merchant_payment',{target_attempt_id:id});if(error)throw error;return attempt(data as Row);},
+  async rejectMerchantPayment(id:string){const{data,error}=await requireSupabase().rpc('owner_reject_merchant_payment',{target_attempt_id:id});if(error)throw error;return attempt(data as Row);},
 };
 
-/** A deliberately non-settling payment boundary. Provider confirmation must call the service-role RPC. */
 export const paymentService = {
-  async createPayment(billId: string) { void billId; throw new Error('Online payments are not configured yet. This bill remains pending until a verified payment provider is connected.'); },
-  async verifyPayment(reference: string) { void reference; throw new Error('Payment verification is available only to the trusted payment webhook.'); },
+  async readiness(billId:string){const{data,error}=await requireSupabase().rpc('get_merchant_payment_readiness',{target_bill_id:billId});if(error)throw error;const row=data as Row;return{available:Boolean(row.available),payeeName:String(row.payeeName||'')};},
+  async createPayment(billId:string){const{data,error}=await requireSupabase().rpc('initiate_merchant_payment',{target_bill_id:billId});if(error)throw error;return attempt(data as Row);},
+  async markAwaiting(id:string){const{data,error}=await requireSupabase().rpc('mark_merchant_payment_awaiting',{target_attempt_id:id});if(error)throw error;return attempt(data as Row);},
+  upiIntent(value:MerchantPaymentAttempt){const params=new URLSearchParams({pa:value.merchantUpi,pn:value.payeeName,am:value.expectedFinalAmount.toFixed(2),cu:'INR',tr:value.reference,tn:`Founder.env bill ${value.reference}`});return`upi://pay?${params.toString()}`;},
 };
