@@ -22,7 +22,7 @@ insert into public.business_reward_settings(
   max_fe_coin_redemption_percent,customer_coin_rate,merchant_coin_rate,enabled
 )
 select id,'percentage',5,150,1000,2,0.01,0.005,true from public.businesses
-where status='active' on conflict(business_id) do nothing;
+where is_active and lifecycle in ('active','grace_period','lite') on conflict(business_id) do nothing;
 
 create table public.merchant_payment_settings (
   business_id uuid primary key references public.businesses(id) on delete cascade,
@@ -157,7 +157,7 @@ begin
   select coalesce(nullif(display_name,''),'Founder.env customer') into customer_name from public.profiles where id=auth.uid();
   insert into public.merchant_payment_attempts(bill_id,customer_id,business_id,customer_display_name,original_amount,founder_benefit,fe_discount,expected_final_amount,merchant_upi,payee_name,unique_reference)
   values(target_bill.id,auth.uid(),target_bill.business_id,customer_name,target_bill.original_amount,target_bill.member_discount,target_bill.fe_coin_discount,target_bill.final_amount,settings.merchant_upi,settings.payee_name,
-    'FE-'||upper(substr(replace(target_bill.id::text,'-',''),1,8))||'-'||upper(substr(encode(gen_random_bytes(6),'hex'),1,12))) returning * into result;
+    'FE-'||upper(substr(replace(target_bill.id::text,'-',''),1,8))||'-'||upper(substr(encode(extensions.gen_random_bytes(6),'hex'),1,12))) returning * into result;
   return result;
 end $$;
 
