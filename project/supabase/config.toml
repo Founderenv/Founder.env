@@ -13,3 +13,6 @@ additional_redirect_urls = ["http://localhost:5173/auth/callback", "http://127.0
 
 [realtime]
 enabled = true
+
+[functions.razorpay-webhook]
+verify_jwt = false

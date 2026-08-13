@@ -812,22 +812,22 @@ export const subscriptions: Subscription[] = businesses.map((b) => ({
   plan: b.plan, status: b.plan === 'pro' ? (Math.random() > 0.7 ? 'expiring' : 'active') : 'expired',
   startDate: b.joinedAt, expiryDate: daysAhead(b.plan === 'pro' ? 20 : -5),
   nextBillingDate: b.plan === 'pro' ? daysAhead(20) : undefined,
-  amount: b.plan === 'pro' ? 299 : 0, autoRenew: b.plan === 'pro',
+  amount: b.plan === 'pro' ? 199 : 0, autoRenew: b.plan === 'pro',
 }));
 
 export const payments: Payment[] = [
-  { id: 'pay_1', businessId: 'biz_cafe_aroma', businessName: 'Cafe Aroma', amount: 599, type: 'activation', status: 'success', date: daysAgo(180), invoiceId: 'INV-001', method: 'UPI' },
-  { id: 'pay_2', businessId: 'biz_cafe_aroma', businessName: 'Cafe Aroma', amount: 299, type: 'subscription', status: 'success', date: daysAgo(30), invoiceId: 'INV-002', method: 'UPI' },
-  { id: 'pay_3', businessId: 'biz_style_hub', businessName: 'Style Hub', amount: 599, type: 'activation', status: 'success', date: daysAgo(120), invoiceId: 'INV-003', method: 'Card' },
-  { id: 'pay_4', businessId: 'biz_fitzone', businessName: 'FitZone Gym', amount: 599, type: 'activation', status: 'success', date: daysAgo(220), invoiceId: 'INV-004', method: 'UPI' },
-  { id: 'pay_5', businessId: 'biz_fitzone', businessName: 'FitZone Gym', amount: 299, type: 'subscription', status: 'success', date: daysAgo(35), invoiceId: 'INV-005', method: 'UPI' },
-  { id: 'pay_6', businessId: 'biz_burger_club', businessName: 'Burger Club', amount: 599, type: 'activation', status: 'success', date: daysAgo(300), invoiceId: 'INV-006', method: 'Card' },
-  { id: 'pay_7', businessId: 'biz_burger_club', businessName: 'Burger Club', amount: 299, type: 'subscription', status: 'failed', date: daysAgo(2), invoiceId: 'INV-007', method: 'UPI' },
-  { id: 'pay_8', businessId: 'biz_dream_salon', businessName: 'Dream Salon', amount: 599, type: 'activation', status: 'success', date: daysAgo(60), invoiceId: 'INV-008', method: 'UPI' },
-  { id: 'pay_9', businessId: 'biz_technest', businessName: 'TechNest', amount: 599, type: 'activation', status: 'pending', date: daysAgo(1), invoiceId: 'INV-009', method: 'UPI' },
-  { id: 'pay_10', businessId: 'biz_urban_edge', businessName: 'Urban Edge', amount: 599, type: 'activation', status: 'failed', date: daysAgo(3), invoiceId: 'INV-010', method: 'Card' },
+  { id: 'pay_1', businessId: 'biz_cafe_aroma', businessName: 'Cafe Aroma', amount: 299, type: 'activation', status: 'success', date: daysAgo(180), invoiceId: 'INV-001', method: 'UPI' },
+  { id: 'pay_2', businessId: 'biz_cafe_aroma', businessName: 'Cafe Aroma', amount: 199, type: 'subscription', status: 'success', date: daysAgo(30), invoiceId: 'INV-002', method: 'UPI' },
+  { id: 'pay_3', businessId: 'biz_style_hub', businessName: 'Style Hub', amount: 299, type: 'activation', status: 'success', date: daysAgo(120), invoiceId: 'INV-003', method: 'Card' },
+  { id: 'pay_4', businessId: 'biz_fitzone', businessName: 'FitZone Gym', amount: 299, type: 'activation', status: 'success', date: daysAgo(220), invoiceId: 'INV-004', method: 'UPI' },
+  { id: 'pay_5', businessId: 'biz_fitzone', businessName: 'FitZone Gym', amount: 199, type: 'subscription', status: 'success', date: daysAgo(35), invoiceId: 'INV-005', method: 'UPI' },
+  { id: 'pay_6', businessId: 'biz_burger_club', businessName: 'Burger Club', amount: 299, type: 'activation', status: 'success', date: daysAgo(300), invoiceId: 'INV-006', method: 'Card' },
+  { id: 'pay_7', businessId: 'biz_burger_club', businessName: 'Burger Club', amount: 199, type: 'subscription', status: 'failed', date: daysAgo(2), invoiceId: 'INV-007', method: 'UPI' },
+  { id: 'pay_8', businessId: 'biz_dream_salon', businessName: 'Dream Salon', amount: 299, type: 'activation', status: 'success', date: daysAgo(60), invoiceId: 'INV-008', method: 'UPI' },
+  { id: 'pay_9', businessId: 'biz_technest', businessName: 'TechNest', amount: 299, type: 'activation', status: 'pending', date: daysAgo(1), invoiceId: 'INV-009', method: 'UPI' },
+  { id: 'pay_10', businessId: 'biz_urban_edge', businessName: 'Urban Edge', amount: 299, type: 'activation', status: 'failed', date: daysAgo(3), invoiceId: 'INV-010', method: 'Card' },
   { id: 'pay_11', businessId: 'biz_burger_club', businessName: 'Burger Club', amount: 500, type: 'promotion', status: 'success', date: daysAgo(10), invoiceId: 'INV-011', method: 'UPI' },
-  { id: 'pay_12', businessId: 'biz_cafe_aroma', businessName: 'Cafe Aroma', amount: 299, type: 'subscription', status: 'refunded', date: daysAgo(60), invoiceId: 'INV-012', method: 'UPI' },
+  { id: 'pay_12', businessId: 'biz_cafe_aroma', businessName: 'Cafe Aroma', amount: 199, type: 'subscription', status: 'refunded', date: daysAgo(60), invoiceId: 'INV-012', method: 'UPI' },
 ];
 
 export const reports: Report[] = [

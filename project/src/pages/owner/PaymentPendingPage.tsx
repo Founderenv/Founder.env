@@ -1,157 +1,50 @@
-import { CreditCard, Clock, CheckCircle2, Mail, LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { CalendarClock, CheckCircle2, CreditCard, Loader2, LogOut, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Logo } from '@/components/layout/Navigation';
+import { razorpaySubscriptionService } from '@/services/razorpayService';
 
-/**
- * PaymentPendingPage — shown to business owners whose business
- * has subscription_status = 'pending' (not yet paid or waived).
- *
- * This page is a PLACEHOLDER — no real Razorpay integration yet.
- * Payment integration will be added in a future release.
- *
- * Activation paths:
- *   1. payment_status = 'paid'  → admin confirms Razorpay payment → activates
- *   2. payment_status = 'waived' → admin calls admin_activate_early_access RPC → activates
- *
- * This page is NEVER shown to customers. It is only accessible
- * via the /owner/payment-pending route, which is guarded for
- * business_owner + onboardingComplete + paymentGate='pending'.
- */
+const features = ['Permanent public business profile', 'Unlimited QR code', 'Deals, stories, and posts', 'Customer follows and messages', 'Analytics dashboard', 'Cancel at the end of a billing cycle'];
+
 export function PaymentPendingPage() {
-  const { profile, ownerBusiness, signOut } = useAuth();
+  const { profile, ownerBusiness, signOut, refreshProfile } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
-  const isEarlyAccess = ownerBusiness?.paymentGate === 'paid';
+  async function subscribe() {
+    setBusy(true); setError('');
+    try {
+      const checkout = await razorpaySubscriptionService.create();
+      await razorpaySubscriptionService.openCheckout(checkout, profile?.email ?? null, async () => {
+        const completion = await refreshProfile();
+        window.location.assign(completion.destination ?? '/owner/analytics');
+      });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not start subscription checkout');
+    } finally { setBusy(false); }
+  }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 dark:bg-gray-950">
-      <div className="mx-auto w-full max-w-md">
-        <div className="mb-6 flex items-center justify-between">
-          <Logo />
-          <button
-            id="payment-pending-signout"
-            onClick={() => void signOut()}
-            className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <LogOut size={14} /> Sign out
-          </button>
-        </div>
-
-        {isEarlyAccess ? (
-          /* Early Access approved — this branch should not normally be seen
-             because the owner would be routed to /owner/analytics instead.
-             Kept as a safety fallback. */
-          <EarlyAccessApproved businessName={ownerBusiness?.businessName} />
-        ) : (
-          <PendingPayment profile={profile} ownerBusiness={ownerBusiness} />
-        )}
+  return <div className="min-h-screen bg-gray-50 px-4 py-10 dark:bg-gray-950">
+    <div className="mx-auto max-w-3xl">
+      <div className="mb-6 flex items-center justify-between"><Logo /><button id="payment-pending-signout" onClick={() => void signOut()} className="flex items-center gap-1.5 text-sm text-gray-500"><LogOut size={14} />Sign out</button></div>
+      <div className="grid overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 md:grid-cols-[1.1fr_.9fr]">
+        <section className="p-7 md:p-9">
+          <p className="text-xs font-semibold uppercase tracking-widest text-brand-600">Founder.env Business</p>
+          <h1 className="mt-3 text-3xl font-bold">Start your business subscription</h1>
+          <p className="mt-3 text-sm leading-6 text-gray-500">Your profile is saved. Authorise Razorpay Autopay to activate <strong className="text-gray-800 dark:text-gray-200">{ownerBusiness?.businessName ?? 'your business'}</strong>.</p>
+          <div className="mt-7 space-y-3">{features.map((feature) => <p key={feature} className="flex items-center gap-2.5 text-sm"><CheckCircle2 size={17} className="shrink-0 text-brand-600" />{feature}</p>)}</div>
+          <div className="mt-7 flex items-start gap-3 rounded-2xl bg-brand-50 p-4 text-sm text-brand-900 dark:bg-brand-500/10 dark:text-brand-200"><ShieldCheck className="mt-0.5 shrink-0" size={19} /><p>Payment details and mandate authentication are handled by Razorpay. Founder.env never receives your card or UPI credentials.</p></div>
+        </section>
+        <aside className="bg-gray-950 p-7 text-white md:p-9">
+          <p className="text-sm text-gray-400">Due today</p><div className="mt-1 flex items-end gap-2"><span className="text-5xl font-bold">₹299</span><span className="pb-1 text-sm text-gray-400">one-time setup</span></div>
+          <div className="my-6 h-px bg-white/10" />
+          <p className="text-sm text-gray-400">Then</p><p className="mt-1 text-2xl font-bold">₹199/month</p>
+          <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-400"><CalendarClock size={16} className="mt-0.5 shrink-0" />Your first monthly bill is scheduled exactly one calendar month after authorisation. The subscription runs for up to 24 monthly charges.</p>
+          <button id="start-razorpay-subscription" disabled={busy} onClick={() => void subscribe()} className="btn-primary mt-7 w-full justify-center disabled:cursor-wait disabled:opacity-70">{busy ? <><Loader2 size={17} className="animate-spin" />Opening secure checkout…</> : <><CreditCard size={17} />Pay ₹299 &amp; Enable AutoPay</>}</button>
+          {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/15 p-3 text-xs text-red-200">{error}</p>}
+          <p className="mt-4 text-center text-[11px] leading-4 text-gray-500">No ₹199 monthly charge is collected today. By continuing, you authorise ₹199/month AutoPay starting one calendar month after activation for up to 24 monthly billing cycles, unless cancelled under the applicable subscription terms.</p>
+        </aside>
       </div>
     </div>
-  );
-}
-
-function PendingPayment({
-  profile,
-  ownerBusiness,
-}: {
-  profile: ReturnType<typeof useAuth>['profile'];
-  ownerBusiness: ReturnType<typeof useAuth>['ownerBusiness'];
-}) {
-  return (
-    <div className="card overflow-hidden p-0">
-      {/* Header gradient */}
-      <div className="bg-gradient-to-br from-brand-600 to-brand-800 p-6 text-white">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
-          <CreditCard size={28} />
-        </div>
-        <h1 className="mt-4 text-2xl font-bold">Early Access Review</h1>
-        <p className="mt-1 text-sm text-brand-200">
-          Your business profile is saved and awaiting manual activation
-        </p>
-      </div>
-
-      <div className="p-6">
-        {ownerBusiness && (
-          <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
-            <p className="text-xs text-gray-500">Business profile</p>
-            <p className="mt-0.5 font-semibold">{ownerBusiness.businessName}</p>
-            <p className="text-sm text-gray-500">@{ownerBusiness.businessUsername}</p>
-          </div>
-        )}
-
-        {/* Early Access scope */}
-        <div className="rounded-2xl border-2 border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10">
-          <p className="font-semibold text-brand-900 dark:text-brand-200">Founder.env Early Access</p>
-          <p className="mt-0.5 text-sm text-brand-700/70 dark:text-brand-400/70">No online payment is requested while payment processing is being completed.</p>
-
-          <div className="mt-4 space-y-2">
-            {[
-              'Permanent public business profile',
-              'Unlimited QR code (never expires)',
-              'Deals, stories, and posts',
-              'Customer follows & DMs',
-              'Analytics dashboard',
-              'Early access to new features',
-            ].map((feature) => (
-              <p key={feature} className="flex items-center gap-2 text-sm text-brand-800 dark:text-brand-300">
-                <CheckCircle2 size={15} className="shrink-0 text-brand-600" />
-                {feature}
-              </p>
-            ))}
-          </div>
-        </div>
-
-        {/* Payment status notice */}
-        <div className="mt-5 flex items-start gap-3 rounded-xl bg-amber-50 p-4 dark:bg-amber-500/10">
-          <Clock size={18} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
-              Manual activation in progress
-            </p>
-            <p className="mt-0.5 text-xs text-amber-700/80 dark:text-amber-400/70">
-              The Founder.env team will review this pilot profile and contact{' '}
-              <strong>{profile?.email ?? 'your registered email'}</strong> when Early Access is activated.
-            </p>
-          </div>
-        </div>
-
-        {/* Contact for early access */}
-        <div className="mt-4 flex items-center gap-3 rounded-xl border border-gray-200 p-4 dark:border-gray-700">
-          <Mail size={18} className="shrink-0 text-gray-400" />
-          <div>
-            <p className="text-sm font-medium">Interested in Early Access?</p>
-            <p className="mt-0.5 text-xs text-gray-500">
-              Email us at{' '}
-              <a href="mailto:hello@founder.env" className="text-brand-600 hover:underline">
-                hello@founder.env
-              </a>{' '}
-              to get your business activated manually while payment is being set up.
-            </p>
-          </div>
-        </div>
-
-        {/* Status indicator */}
-        <div className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-gray-100 py-2.5 text-sm text-gray-500 dark:bg-gray-800">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-          Business profile saved · Pending activation
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EarlyAccessApproved({ businessName }: { businessName?: string }) {
-  return (
-    <div className="card p-8 text-center">
-      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-success-50 text-success-600 dark:bg-success-500/10">
-        <CheckCircle2 size={32} />
-      </div>
-      <h1 className="mt-4 text-2xl font-bold">Early Access Approved</h1>
-      <p className="mt-2 text-sm text-gray-500">
-        {businessName ? `${businessName} is` : 'Your business is'} now live on Founder.env.
-      </p>
-      <a href="/owner/analytics" className="btn-primary mt-6 inline-flex">
-        Go to Owner Dashboard
-      </a>
-    </div>
-  );
+  </div>;
 }

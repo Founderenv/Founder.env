@@ -120,7 +120,7 @@ export function LandingPage() {
               <span className="text-3xl font-bold text-gray-900 dark:text-white">₹299</span>
               <span className="text-sm text-gray-500">/month</span>
             </div>
-            <p className="mt-1 text-xs text-gray-500">₹599 one-time activation includes 30 days Pro</p>
+            <p className="mt-1 text-xs text-gray-500">₹299 setup today · first ₹199 monthly bill one calendar month later</p>
             <ul className="mt-4 space-y-2">
               {['Everything in Lite', 'Stories & posts', 'Deals & Deal Clips', 'Rewards, loyalty & referrals', 'Scratch & Win campaigns', 'Analytics dashboard', 'All 10 premium templates', 'Review replies'].map((f) => (
                 <li key={f} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -143,7 +143,7 @@ export function LandingPage() {
             { q: 'What happens when Pro expires?', a: 'Your profile stays live but switches to Lite mode. You keep your QR code, basic info, followers, and DMs. Upgrade anytime to restore all features.' },
             { q: 'Do I need to print a new QR every time?', a: 'No. Your QR code is permanent. It always points to your Founder.env business profile, no matter how much you update it.' },
             { q: 'Can customers see my business without an account?', a: 'Yes. Anyone who scans your QR can browse your profile, deals, and reviews. They only need to sign in to follow, claim deals, or leave reviews.' },
-            { q: 'Is there a free trial?', a: 'The ₹599 activation includes 30 days of Pro features. After that, you can continue on Lite for free or subscribe to Pro at ₹299/month.' },
+            { q: 'When does monthly billing start?', a: 'You pay the ₹299 one-time setup fee when you authorise Razorpay Autopay. The first ₹199 monthly payment is scheduled exactly one calendar month later.' },
             { q: 'Can I run multiple businesses?', a: 'Yes. You can create and manage multiple business profiles from a single owner account.' },
           ].map((faq) => (
             <details key={faq.q} className="card p-4 group">

@@ -413,6 +413,15 @@ export interface Subscription {
   nextBillingDate?: string;
   amount: number;
   autoRenew: boolean;
+  setupFeePaid?: boolean;
+  setupFeeAmount?: number;
+  monthlyAmount?: number;
+  autopayAuthorized?: boolean;
+  providerStatus?: string;
+  totalCount?: number;
+  paidCount?: number;
+  cancelAtPeriodEnd?: boolean;
+  activationType?: 'pending' | 'razorpay' | 'early_access' | 'complimentary' | 'trial';
 }
 
 export interface Payment {

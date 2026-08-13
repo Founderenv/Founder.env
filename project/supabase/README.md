@@ -1,6 +1,6 @@
 # Founder.env Supabase setup
 
-This folder targets the existing Supabase project `fyomwpwkaqgjcaydqyjt`. It contains ordered SQL migrations, a secure Scratch & Win Edge Function, and a post-deploy verification query.
+This folder targets the existing Supabase project `fyomwpwkaqgjcaydqyjt`. It contains ordered SQL migrations, secure Edge Functions, and a post-deploy verification query.
 
 ## Required frontend environment
 
@@ -23,6 +23,8 @@ npx supabase login
 npx supabase link --project-ref fyomwpwkaqgjcaydqyjt
 npx supabase db push
 npx supabase functions deploy scratch-play --project-ref fyomwpwkaqgjcaydqyjt
+npx supabase functions deploy razorpay-subscription --project-ref fyomwpwkaqgjcaydqyjt
+npx supabase functions deploy razorpay-webhook --no-verify-jwt --project-ref fyomwpwkaqgjcaydqyjt
 ```
 
 The Edge Function automatically receives `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from Supabase. Do not commit those secrets.
@@ -43,12 +45,8 @@ After deployment, run `verification.sql` in the Supabase SQL Editor. It reports 
 
 Create Customer A/B and Owner A/B accounts plus two businesses. Confirm that Customer A cannot update Customer B, owners cannot mutate or read another owner's private business data/messages, unrelated users cannot read conversations, duplicate follow/review/claim constraints hold, and follower/public profile queries never return email. Confirm payment status cannot be written by business accounts and Scratch outcomes can only be created through the Edge Function. Finally verify admin reads/mutations with an actual server-assigned admin account and confirm `admin_audit_logs` records privileged changes.
 
-## Phase 3 payment integration
+## Razorpay subscription configuration
 
-1. Add Razorpay order creation and webhook Edge Functions with secrets stored only as Supabase function secrets.
-2. Create pending `payments` rows server-side with idempotency keys and gateway order IDs.
-3. Verify webhook signatures against the raw request body and deduplicate gateway events.
-4. In one database transaction, mark payment success, issue an invoice, and activate/extend the subscription and business lifecycle.
-5. Implement refund and partial-refund webhook transitions, reconciliation, retries, and audit logging.
-6. Expose read-only payment/subscription state to owners; never accept success or plan activation from the browser.
-7. Add sandbox integration tests, replay/duplicate webhook tests, failure/grace/Lite downgrade jobs, then complete a production credential and observability review.
+Create a Razorpay test-mode plan for ₹199 monthly, then configure the four server-only values listed in `supabase/.env.example` with `supabase secrets set`. The application creates a 24-charge subscription with a ₹299 one-time add-on and a `start_at` exactly one calendar month later. Do not put Razorpay credentials in `.env.local`, a `VITE_` variable, or browser code.
+
+Configure the Razorpay webhook URL as the deployed `razorpay-webhook` function and subscribe to the supported subscription events. The function verifies the raw-body HMAC using `RAZORPAY_WEBHOOK_SECRET`, deduplicates `x-razorpay-event-id`, and applies provider state in a database transaction. Existing Early Access, complimentary, and trial activations remain separate from Razorpay billing.

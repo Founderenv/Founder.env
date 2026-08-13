@@ -14,7 +14,7 @@ test.describe('targeted Home, profile and deal flows', () => {
     await expect(page.getByText('FitZone Gym').filter({ visible: true })).toBeVisible();
     await page.getByRole('button', { name: 'All', exact: true }).filter({ visible: true }).click();
     await search.fill('Cafe Aroma');
-    await expect(page.getByText('Cafe Aroma', { exact: true }).filter({ visible: true })).toBeVisible();
+    await expect(page.locator('a[href="/business/cafearoma"]').filter({ visible: true }).first()).toBeVisible();
     await page.locator('a[href="/business/cafearoma"]').filter({ visible: true }).first().click();
     await expect(page).toHaveURL(/\/business\/cafearoma$/);
   });
