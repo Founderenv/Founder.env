@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, CreditCard, Image as ImageIcon, MapPin, Store, Loader2 } from 'lucide-react';
-import { businessService, categoryService, templateService } from '@/services';
+import { businessService, categoryService } from '@/services';
 import { dataMode } from '@/lib/supabase';
 import { useAuth } from '@/auth/AuthProvider';
-import type { BusinessTemplateConfig, Category, TemplateId } from '@/types';
+import type { Category } from '@/types';
 import { cn } from '@/utils/format';
 
-const steps = ['Account', 'Business', 'Username', 'Category', 'Logo', 'Cover', 'Location', 'Contact', 'Template', 'Preview', 'Activate'];
+const steps = ['Account', 'Business', 'Username', 'Category', 'Logo', 'Cover', 'Location', 'Contact', 'Preview', 'Activate'];
 
 interface Draft {
   name: string;
@@ -17,8 +17,9 @@ interface Draft {
   phone: string;
   whatsapp: string;
   email: string;
-  template: string;
   description: string;
+  services: string;
+  preferredLanguage: 'Auto' | 'English' | 'Hindi' | 'Marathi';
   address: string;
 }
 
@@ -27,7 +28,6 @@ export function OnboardingPage() {
   const { completeBusinessOnboarding } = useAuth();
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [templates, setTemplates] = useState<BusinessTemplateConfig[]>([]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -44,8 +44,9 @@ export function OnboardingPage() {
           phone: '+91 98765 43210',
           whatsapp: '+91 98765 43210',
           email: 'hello@cafearoma.in',
-          template: 'minimal_premium',
           description: 'Artisanal coffee house and organic bakery',
+          services: 'Speciality coffee, fresh bakery, breakfast',
+          preferredLanguage: 'Auto',
           address: 'Main Street, Pune',
         }
       : {
@@ -56,26 +57,24 @@ export function OnboardingPage() {
           phone: '',
           whatsapp: '',
           email: '',
-          template: '',
           description: '',
+          services: '',
+          preferredLanguage: 'Auto',
           address: '',
         }
   );
 
   useEffect(() => {
-    void Promise.all([categoryService.getAll(), templateService.getAll()]).then(([categoryRows, templateRows]) => {
+    void categoryService.getAll().then((categoryRows) => {
       setCategories(categoryRows);
-      setTemplates(templateRows);
       setDraft((value) => ({
         ...value,
         category: value.category || categoryRows[0]?.name || '',
-        template: value.template || templateRows[0]?.id || '',
       }));
     });
   }, []);
 
   const update = (key: keyof Draft, value: string) => setDraft((d) => ({ ...d, [key]: value }));
-  const selectedTemplate = templates.find((item) => item.id === draft.template) ?? templates[0];
 
   const handleSaveBusiness = async () => {
     if (savingRef.current) return;
@@ -99,7 +98,9 @@ export function OnboardingPage() {
           whatsapp: draft.whatsapp,
           email: draft.email,
           description: draft.description,
-          templateId: (draft.template as TemplateId) || 'minimal_premium',
+          templateId: 'minimal_premium',
+          servicesSummary: draft.services,
+          preferredContentLanguage: draft.preferredLanguage,
         },
         {
           logo: logoFile || undefined,
@@ -145,7 +146,7 @@ export function OnboardingPage() {
         )}
 
         {step === 0 && <Intro icon={Store} title="Your account comes first" text="Create your business profile on Founder.env to connect with customers and showcase your offerings." />}
-        {step === 1 && <Field label="Business name" value={draft.name} onChange={(v) => update('name', v)} hint="Use the name customers know you by." />}
+        {step === 1 && <div className="space-y-4"><Field label="Business name" value={draft.name} onChange={(v) => update('name', v)} hint="Use the name customers know you by." /><Field label="Business description" value={draft.description} onChange={(v) => update('description', v)} placeholder="What makes your business useful or special?" /><Field label="Main products or services" value={draft.services} onChange={(v) => update('services', v)} placeholder="For example: haircuts, bridal styling, skincare" /></div>}
         {step === 2 && <Field label="Founder.env username" value={draft.username} onChange={(v) => update('username', v.toLowerCase().replace(/[^a-z0-9_]/g, ''))} prefix="founder.env/business/" hint="Usernames must be lowercase letters, numbers, and underscores." />}
         {step === 3 && <ChoiceGrid values={categories.map((c) => ({ id: c.name, name: c.name, detail: 'Business category' }))} active={draft.category} onChange={(v) => update('category', v)} />}
         {step === 4 && <UploadPlaceholder icon={Store} title="Add your business logo" detail="Square PNG or JPG, at least 400 × 400px" selectedFile={logoFile} onSelectFile={setLogoFile} />}
@@ -166,11 +167,11 @@ export function OnboardingPage() {
             <div className="sm:col-span-2">
               <Field label="Business email" value={draft.email} onChange={(v) => update('email', v)} />
             </div>
+            <label className="sm:col-span-2"><span className="label">Preferred content language</span><select className="input" value={draft.preferredLanguage} onChange={(event) => update('preferredLanguage', event.target.value)}><option>Auto</option><option>English</option><option>Hindi</option><option>Marathi</option></select><span className="mt-2 block text-xs text-gray-400">AI Content Studio uses this preference when creating posts.</span></label>
           </div>
         )}
-        {step === 8 && <ChoiceGrid values={templates.map((t) => ({ id: t.id, name: t.name, detail: t.description, color: t.accentColor }))} active={draft.template} onChange={(v) => update('template', v)} />}
-        {step === 9 && <Preview draft={draft} accent={selectedTemplate?.accentColor ?? '#4f46e5'} logoFile={logoFile} coverFile={coverFile} />}
-        {step === 10 && <Activation onSave={handleSaveBusiness} saving={saving} />}
+        {step === 8 && <Preview draft={draft} logoFile={logoFile} coverFile={coverFile} />}
+        {step === 9 && <Activation onSave={handleSaveBusiness} saving={saving} />}
       </div>
 
       <div className="mt-5 flex items-center justify-between">
@@ -255,7 +256,7 @@ function ChoiceGrid({ values, active, onChange }: { values: { id: string; name: 
   );
 }
 
-function Preview({ draft, accent, logoFile, coverFile }: { draft: Draft; accent: string; logoFile: File | null; coverFile: File | null }) {
+function Preview({ draft, logoFile, coverFile }: { draft: Draft; logoFile: File | null; coverFile: File | null }) {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
 
@@ -284,7 +285,7 @@ function Preview({ draft, accent, logoFile, coverFile }: { draft: Draft; accent:
       {coverPreview ? (
         <img src={coverPreview} className="h-28 w-full object-cover" alt="Cover" />
       ) : (
-        <div className="h-28" style={{ background: `linear-gradient(135deg, ${accent}, #111827)` }} />
+        <div className="h-28 bg-gradient-to-br from-brand-500 to-gray-950" />
       )}
       <div className="p-5">
         {logoPreview ? (
@@ -297,7 +298,7 @@ function Preview({ draft, accent, logoFile, coverFile }: { draft: Draft; accent:
         <h2 className="mt-3 text-xl font-bold">{draft.name || 'Your Business Name'}</h2>
         <p className="text-sm text-gray-500">@{draft.username || 'username'} · {draft.category || 'Category'}</p>
         <p className="mt-2 text-sm text-gray-500">{draft.location || 'Location'}</p>
-        <div className="mt-4 w-full rounded-xl py-2.5 text-center text-sm font-semibold text-white" style={{ background: accent }}>
+        <div className="mt-4 w-full rounded-xl bg-brand-600 py-2.5 text-center text-sm font-semibold text-white">
           Follow
         </div>
       </div>

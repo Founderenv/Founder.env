@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Save, Upload, Loader2 } from 'lucide-react';
-import { businessService, categoryService, ownerService, templateService } from '@/services';
-import type { Business, BusinessTemplateConfig, Category } from '@/types';
+import { businessService, categoryService, ownerService } from '@/services';
+import type { Business, Category } from '@/types';
 import { cn } from '@/utils/format';
 
 export function OwnerEditPage() {
   const [business, setBusiness] = useState<Business | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [templates, setTemplates] = useState<BusinessTemplateConfig[]>([]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -17,10 +16,9 @@ export function OwnerEditPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void Promise.all([ownerService.getCurrent(), categoryService.getAll(), templateService.getAll()]).then(
-      async ([owner, categoryRows, templateRows]) => {
+    void Promise.all([ownerService.getCurrent(), categoryService.getAll()]).then(
+      async ([owner, categoryRows]) => {
         setCategories(categoryRows);
-        setTemplates(templateRows);
         const owned = await businessService.getByOwner(owner.id);
         setBusiness(owned[0] ?? null);
         setLoading(false);
@@ -135,6 +133,7 @@ export function OwnerEditPage() {
                 <textarea className="input resize-none" rows={4} value={business.description} onChange={(e) => field('description', e.target.value)} />
               </label>
             </div>
+            <div className="sm:col-span-2"><Input label="Main products or services" value={business.servicesSummary ?? ''} onChange={(v) => field('servicesSummary', v)} /></div>
             <Input
               label="Instagram"
               value={business.socialLinks.instagram ?? ''}
@@ -145,24 +144,7 @@ export function OwnerEditPage() {
               value={business.socialLinks.website ?? ''}
               onChange={(v) => setBusiness((b) => (b ? { ...b, socialLinks: { ...b.socialLinks, website: v } } : b))}
             />
-            <label>
-              <span className="label">Template</span>
-              <select className="input" value={business.templateId} onChange={(e) => field('templateId', e.target.value)}>
-                {templates.map((t) => (
-                  <option value={t.id} key={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span className="label">Profile theme</span>
-              <select className="input" value={business.templateTheme} onChange={(e) => field('templateTheme', e.target.value)}>
-                <option value="default">Template default</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
+            <label><span className="label">Preferred content language</span><select className="input" value={business.preferredContentLanguage ?? 'Auto'} onChange={(e) => field('preferredContentLanguage', e.target.value)}><option>Auto</option><option>English</option><option>Hindi</option><option>Marathi</option></select></label>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">

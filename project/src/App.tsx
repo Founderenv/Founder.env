@@ -31,6 +31,8 @@ const AuthCallbackPage = lazy(() => import('@/pages/auth/AuthPages').then((m) =>
 const ChooseRolePage = lazy(() => import('@/pages/auth/AuthPages').then((m) => ({ default: m.ChooseRolePage })));
 const CustomerDashboard = lazy(() => import('@/pages/customer/CustomerDashboard').then((m) => ({ default: m.CustomerDashboard })));
 const BusinessDashboard = lazy(() => import('@/pages/owner/BusinessDashboard').then((m) => ({ default: m.BusinessDashboard })));
+const AIContentStudioPage = lazy(() => import('@/pages/owner/AIContentStudioPage').then((m) => ({ default: m.AIContentStudioPage })));
+const ContentProPage = lazy(() => import('@/pages/owner/AIContentStudioPage').then((m) => ({ default: m.ContentProPage })));
 const PostDetailPage = lazy(() => import('@/pages/customer/PostDetailPage').then((m) => ({ default: m.PostDetailPage })));
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -287,6 +289,8 @@ function RoutedApp() {
             }
           />
           <Route path="/owner/home" element={<Navigate to="/" replace />} />
+          <Route path="/owner/ai-content" element={<AuthGate roles={['business_owner']} requirePayment><AIContentStudioPage /></AuthGate>} />
+          <Route path="/owner/content-pro" element={<AuthGate roles={['business_owner']} requirePayment><ContentProPage /></AuthGate>} />
           <Route path="/owner/profile" element={<AuthGate roles={['business_owner']} requirePayment><OwnerProfilePage /></AuthGate>} />
           <Route
             path="/owner/:section"

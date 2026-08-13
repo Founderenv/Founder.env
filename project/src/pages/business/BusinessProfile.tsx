@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Phone, MessageCircle, Star, Edit, Plus, BarChart3, QrCode, Instagram, Globe, Navigation, ChevronLeft } from 'lucide-react';
+import { Phone, MessageCircle, Star, Edit, Plus, BarChart3, QrCode, Instagram, Globe, Navigation, ChevronLeft, WandSparkles } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge, StatusBadge } from '@/components/ui/StatusBadge';
 import { FollowButton } from '@/components/ui/FollowButton';
@@ -24,6 +24,7 @@ import { useCurrentCustomer } from '@/hooks/useCurrentCustomer';
 import { dataMode } from '@/lib/supabase';
 import { useAuth } from '@/auth/AuthProvider';
 import { founderV2Service } from '@/services/v2Service';
+import { AIOrb } from '@/components/ai/AIOrb';
 import { formatNumber, cn, timeAgo } from '@/utils/format';
 import type { Story, Post, Deal, Review, VideoClip, StoryHighlight } from '@/types';
 
@@ -201,10 +202,7 @@ export function BusinessProfile() {
             </div>
           )}
           {isOwner && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link to="/owner/create?type=story" className="btn-primary text-xs px-3 py-2"><Plus size={14} /> Add Story</Link>
-              <Link to="/owner/create" className="btn-outline text-xs px-3 py-2"><Plus size={14} /> Create Post</Link>
-            </div>
+            <><div className="mt-3 flex flex-wrap gap-2"><Link to="/owner/create?type=story" className="btn-primary text-xs px-3 py-2"><Plus size={14} /> Add Story</Link><Link to="/owner/ai-content" className="btn-outline text-xs px-3 py-2"><WandSparkles size={14} /> AI Studio</Link><Link to="/owner/create" className="btn-outline text-xs px-3 py-2"><Plus size={14} /> Create Post</Link></div><Link to="/owner/ai-content" className="mt-4 flex items-center justify-between overflow-hidden rounded-2xl bg-[#06100c] p-4 text-white"><div><p className="text-xs font-semibold uppercase tracking-widest text-brand-300">Founder.env AI</p><p className="mt-1 font-semibold">Create today's post</p><p className="mt-1 text-xs text-white/45">Ready with your business memory.</p></div><AIOrb compact/></Link></>
           )}
         </div>
 

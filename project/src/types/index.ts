@@ -169,6 +169,8 @@ export interface Business {
   featuredProducts: { name: string; price: string; image: string; description?: string }[];
   popularItems: { name: string; price: string; image: string }[];
   todayOffer?: string;
+  servicesSummary?: string;
+  preferredContentLanguage?: 'Auto' | 'English' | 'Hindi' | 'Marathi';
 }
 
 export interface BusinessFollower {

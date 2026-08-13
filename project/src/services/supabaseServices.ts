@@ -43,7 +43,7 @@ async function removeAsset(bucket:string,path:string){if(path)await requireSupab
 
 function businessPayload(updates: Partial<Business>): Row {
   const payload: Row = {};
-  const mapping: Partial<Record<keyof Business, string>> = { name:'name',username:'username',description:'description',bio:'bio',category:'category',phone:'phone',whatsapp:'whatsapp',email:'email',address:'address',location:'location',city:'city',state:'state',templateId:'template_key',templateTheme:'theme',todayOffer:'today_offer' };
+  const mapping: Partial<Record<keyof Business, string>> = { name:'name',username:'username',description:'description',bio:'bio',category:'category',phone:'phone',whatsapp:'whatsapp',email:'email',address:'address',location:'location',city:'city',state:'state',templateId:'template_key',templateTheme:'theme',todayOffer:'today_offer',servicesSummary:'services_summary',preferredContentLanguage:'preferred_content_language' };
   for (const [key,column] of Object.entries(mapping)) { const value=updates[key as keyof Business]; if(value!==undefined)payload[column]=value; }
   if(updates.openingHours)payload.opening_hours=updates.openingHours;
   if(updates.featuredProducts)payload.featured_products=updates.featuredProducts;
@@ -69,6 +69,7 @@ function mapBusiness(value: unknown): Business {
     galleryImages: rows(r.gallery).map((item) => publicAsset('business-gallery', item.storage_path)),
     featuredProducts: (Array.isArray(r.featured_products) ? r.featured_products : []) as Business['featuredProducts'],
     popularItems: (Array.isArray(r.popular_items) ? r.popular_items : []) as Business['popularItems'], todayOffer: str(r.today_offer) || undefined,
+    servicesSummary: str(r.services_summary), preferredContentLanguage: str(r.preferred_content_language,'Auto') as Business['preferredContentLanguage'],
   };
 }
 

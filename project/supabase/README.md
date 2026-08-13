@@ -50,3 +50,11 @@ Create Customer A/B and Owner A/B accounts plus two businesses. Confirm that Cus
 Create a Razorpay test-mode plan for ₹199 monthly, then configure the four server-only values listed in `supabase/.env.example` with `supabase secrets set`. The application creates a 24-charge subscription with a ₹299 one-time add-on and a `start_at` exactly one calendar month later. Do not put Razorpay credentials in `.env.local`, a `VITE_` variable, or browser code.
 
 Configure the Razorpay webhook URL as the deployed `razorpay-webhook` function and subscribe to the supported subscription events. The function verifies the raw-body HMAC using `RAZORPAY_WEBHOOK_SECRET`, deduplicates `x-razorpay-event-id`, and applies provider state in a database transaction. Existing Early Access, complimentary, and trial activations remain separate from Razorpay billing.
+
+## AI Content Studio
+
+Apply migrations before deploying `ai-content-studio`. The default `AI_CONTENT_PROVIDER=mock` adapter is deterministic and requires no third-party key; it exists for local and integration testing. Production text and image providers should implement the interfaces in `functions/ai-content-studio/provider.ts`, keep image prompts text-free, and read provider credentials only from Edge Function secrets. Never add AI secrets to a `VITE_` variable.
+
+```powershell
+npx supabase functions deploy ai-content-studio --project-ref fyomwpwkaqgjcaydqyjt
+```

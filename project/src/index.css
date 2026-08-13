@@ -143,3 +143,10 @@
   from { width: 100%; }
   to { width: 0%; }
 }
+
+@keyframes ai-orbit { to { transform: rotate(360deg); } }
+@keyframes ai-breathe { 50% { transform: scale(1.08); opacity: .72; } }
+.ai-orb-ring { background: conic-gradient(from 90deg, transparent 0 12%, #41cc8b 34%, #6ee7b7 48%, transparent 70%); animation: ai-orbit 10s linear infinite; filter: drop-shadow(0 0 14px rgba(65,204,139,.35)); }
+.ai-orb-core { background: radial-gradient(circle at 35% 30%, #a7f3d0, #109a59 34%, #052e1c 70%); box-shadow: inset -12px -14px 30px rgba(0,0,0,.35), 0 0 35px rgba(27,179,112,.42); }
+.ai-orb-glow { background: rgba(65,204,139,.2); animation: ai-breathe 3.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ai-orb-ring,.ai-orb-glow { animation: none; } }

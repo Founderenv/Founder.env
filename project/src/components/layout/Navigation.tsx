@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut, Bell } from 'lucide-react';
+import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut, Bell, WandSparkles } from 'lucide-react';
 import { type Role } from '@/types';
 import { cn } from '@/utils/format';
 import { useEffect, useState } from 'react';
@@ -24,6 +24,7 @@ const customerNav: NavItem[] = [
 
 const ownerNav: NavItem[] = [
   { to: '/business/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/owner/ai-content', label: 'AI Content Studio', icon: WandSparkles },
   { to: '/', label: 'Home', icon: Home },
   { to: '/owner/create', label: 'Create', icon: Plus },
   { to: '/owner/profile', label: 'Profile', icon: User },
@@ -35,8 +36,8 @@ const ownerNav: NavItem[] = [
 const ownerMobileNav: NavItem[] = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/messages', label: 'Message', icon: MessageCircle },
+  { to: '/owner/ai-content', label: 'AI Studio', icon: WandSparkles },
   { to: '/owner/create', label: 'Create', icon: Plus },
-  { to: '/owner/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/owner/profile', label: 'Profile', icon: User },
 ];
 
