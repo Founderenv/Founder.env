@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Check, CreditCard, Gift, QrCode, Users } from 'lucide-react';
 import { AnalyticsChart, MetricCard, TrafficSourceBar } from '@/components/admin/Analytics';
@@ -7,7 +7,7 @@ import { QRCard, QRPoster } from '@/components/qr/QRCard';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { loyaltyMembers, loyaltyPrograms, payments, referralCampaigns, rewardCampaigns, subscriptions } from '@/mocks/data';
 import { analyticsService, businessService, ownerService, subscriptionService } from '@/services';
-import { dataMode } from '@/lib/supabase';
+import { dataMode, requireSupabase } from '@/lib/supabase';
 import type { AnalyticsMetric, AnalyticsSeries, Business, Payment, Subscription, TrafficSource } from '@/types';
 import { formatDate, formatCurrency } from '@/utils/format';
 
@@ -30,7 +30,8 @@ function QRSection({ business }: { business: Business }) {
 
 function AnalyticsSection({ businessId }: { businessId: string }) {
   const [metrics, setMetrics] = useState<AnalyticsMetric[]>([]); const [series, setSeries] = useState<AnalyticsSeries[]>([]); const [sources, setSources] = useState<TrafficSource[]>([]); const [range, setRange] = useState('7 Days');
-  useEffect(() => { analyticsService.getOwnerMetrics(businessId).then((data) => { setMetrics(data.metrics); setSeries(data.series); setSources(data.trafficSources); }); }, [businessId]);
+  const load=useCallback(()=>analyticsService.getOwnerMetrics(businessId).then((data) => { setMetrics(data.metrics); setSeries(data.series); setSources(data.trafficSources); }),[businessId]);
+  useEffect(() => { void load();if(dataMode!=='supabase')return;const client=requireSupabase();const channel=client.channel(`owner-analytics:${businessId}`).on('postgres_changes',{event:'*',schema:'public',table:'business_followers',filter:`business_id=eq.${businessId}`},()=>void load()).on('postgres_changes',{event:'*',schema:'public',table:'bill_requests',filter:`business_id=eq.${businessId}`},()=>void load()).on('postgres_changes',{event:'*',schema:'public',table:'bills',filter:`business_id=eq.${businessId}`},()=>void load()).subscribe();return()=>{void client.removeChannel(channel);}; }, [businessId,load]);
   return <div><div className="mb-5 flex gap-2 overflow-x-auto">{['Today', '7 Days', '30 Days', '90 Days'].map((item) => <button key={item} onClick={() => setRange(item)} className={range === item ? 'btn-primary whitespace-nowrap' : 'btn-outline whitespace-nowrap'}>{item}</button>)}</div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <MetricCard key={metric.label} metric={metric} />)}</div><div className="mt-5 grid gap-5 xl:grid-cols-2">{series.map((item) => <AnalyticsChart key={item.label} series={item} />)}<div className="card p-5"><h2 className="font-semibold">Traffic sources</h2><div className="mt-4"><TrafficSourceBar sources={sources} /></div></div></div><p className="mt-4 text-xs text-gray-400">Showing {range.toLowerCase()} analytics events available to this business.</p></div>;
 }
 

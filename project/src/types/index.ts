@@ -342,6 +342,7 @@ export interface Conversation {
   businessName: string;
   businessAvatar: string;
   businessLogo: string;
+  businessUsername?: string;
   customerId: string;
   customerName: string;
   customerAvatar: string;
@@ -373,6 +374,8 @@ export interface Notification {
   businessAvatar?: string;
   businessId?: string;
   businessUsername?: string;
+  entityType?: string;
+  entityId?: string;
   isRead: boolean;
   createdAt: string;
   actionLabel?: string;

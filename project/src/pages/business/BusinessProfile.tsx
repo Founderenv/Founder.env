@@ -86,6 +86,7 @@ export function BusinessProfile() {
   if (error || !business) return <ErrorState title="Business unavailable" description={error || 'This business could not be found.'} />;
 
   const handleFollow = async () => {
+    if (!dataLoaded) return;
     if (dataMode === 'supabase' && (!auth.user || auth.profile?.role !== 'customer')) {
       navigate('/auth');
       return;
@@ -154,7 +155,7 @@ export function BusinessProfile() {
               </>
             ) : (
               <>
-                {role !== 'owner' && <FollowButton isFollowing={isFollowing} onToggle={() => void handleFollow()} size="sm" />}
+                {role !== 'owner' && <FollowButton isFollowing={isFollowing} onToggle={() => void handleFollow()} size="sm" disabled={!dataLoaded} />}
                 {dataMode === 'supabase' && auth.profile?.role === 'customer' && <button type="button" className="btn-primary text-xs px-3 py-2" disabled={!isFollowing || requestingBill} onClick={() => void handleRequestBill()}>{requestingBill ? 'Requesting...' : 'Request Bill'}</button>}
                 <Link to="/messages" className="btn-outline text-xs px-3 py-2"><MessageCircle size={14} /> Message</Link>
               </>

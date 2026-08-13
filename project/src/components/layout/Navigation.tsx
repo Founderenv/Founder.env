@@ -1,11 +1,12 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut } from 'lucide-react';
+import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut, Bell } from 'lucide-react';
 import { type Role } from '@/types';
 import { cn } from '@/utils/format';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { dataMode } from '@/lib/supabase';
 import { useAuth } from '@/auth/AuthProvider';
+import { notificationService } from '@/services';
 
 interface NavItem {
   to: string;
@@ -31,7 +32,13 @@ const ownerNav: NavItem[] = [
   { to: '/owner/qr', label: 'QR', icon: Menu },
 ];
 
-const ownerMobileNav = ownerNav.filter((item) => ['/business/dashboard', '/', '/owner/create', '/owner/profile', '/owner/analytics'].includes(item.to));
+const ownerMobileNav: NavItem[] = [
+  { to: '/', label: 'Home', icon: Home },
+  { to: '/messages', label: 'Message', icon: MessageCircle },
+  { to: '/owner/create', label: 'Create', icon: Plus },
+  { to: '/owner/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/owner/profile', label: 'Profile', icon: User },
+];
 
 function LogoutButton({ onDone }: { onDone?: () => void }) {
   const { signOut } = useAuth();
@@ -224,10 +231,8 @@ export function TopNavigation({ role }: { role: Role }) {
           <Logo />
         </Link>
         <div className="flex items-center gap-3">
-          <Link to="/notifications" className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800" aria-label="Notifications">
-            <MessageCircle size={20} />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-error-500" />
-          </Link>
+          {role === 'owner' && <Link to="/business/dashboard" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-semibold text-brand-700 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10" title="Dashboard"><LayoutDashboard size={18}/><span className="hidden min-[360px]:inline">Dashboard</span></Link>}
+          <NotificationBell />
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800">
             {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -249,3 +254,5 @@ export function TopNavigation({ role }: { role: Role }) {
     </header>
   );
 }
+
+function NotificationBell(){const[count,setCount]=useState(0);useEffect(()=>{let active=true;const load=()=>void notificationService.getUnreadCount().then((value)=>{if(active)setCount(value);}).catch(()=>undefined);load();window.addEventListener('founder:notifications-changed',load);return()=>{active=false;window.removeEventListener('founder:notifications-changed',load);};},[]);return <Link to="/notifications" className="relative rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800" aria-label={`Notifications${count?` (${count} unread)`:''}`}><Bell size={20}/>{count>0&&<span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-error-500 px-1 text-[10px] font-bold text-white">{count>99?'99+':count}</span>}</Link>;}

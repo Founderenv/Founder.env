@@ -6,6 +6,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useTheme, useRole } from '@/hooks/useTheme';
 import { cn } from '@/utils/format';
 import { useAuth } from '@/auth/AuthProvider';
+import { RealtimeCenter } from '@/components/realtime/RealtimeCenter';
 
 interface AppShellProps {
   children: ReactNode;
@@ -44,6 +45,7 @@ export function AppShell({ children, showNav = true, maxWidth = 'feed' }: AppShe
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {isBackendMode && user && <RealtimeCenter />}
       <div className="hidden lg:block">
         <DesktopSidebar role={role}>
           <div className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-950">

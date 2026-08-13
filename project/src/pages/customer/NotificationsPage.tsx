@@ -22,6 +22,7 @@ export function NotificationsPage() {
   const markAllRead = () => {
     notificationService.markAllRead().then(() => {
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      window.dispatchEvent(new CustomEvent('founder:notifications-changed'));
     });
   };
 
@@ -43,6 +44,7 @@ export function NotificationsPage() {
             <Link
               key={n.id}
               to={n.actionLink || '#'}
+              onClick={() => { if(!n.isRead) void notificationService.markRead(n.id).then(()=>window.dispatchEvent(new CustomEvent('founder:notifications-changed'))); }}
               className={cn(
                 'flex items-start gap-3 rounded-xl p-3 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800',
                 !n.isRead && 'bg-brand-50/50 dark:bg-brand-500/5'
@@ -59,6 +61,7 @@ export function NotificationsPage() {
                 <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{n.title}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-400">{n.body}</p>
                 <span className="text-xs text-gray-400">{timeAgo(n.createdAt)}</span>
+                {n.actionLabel && <span className="mt-2 inline-flex rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white">{n.actionLabel}</span>}
               </div>
               {!n.isRead && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-brand-600" />}
             </Link>

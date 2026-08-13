@@ -6,14 +6,16 @@ interface FollowButtonProps {
   onToggle: () => void;
   size?: 'sm' | 'md';
   className?: string;
+  disabled?: boolean;
 }
 
-export function FollowButton({ isFollowing, onToggle, size = 'md', className }: FollowButtonProps) {
+export function FollowButton({ isFollowing, onToggle, size = 'md', className, disabled = false }: FollowButtonProps) {
   return (
     <button
       onClick={onToggle}
+      disabled={disabled}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all active:scale-[0.98] no-tap',
+        'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 no-tap',
         size === 'sm' ? 'px-4 py-2 text-xs' : 'px-5 py-2.5 text-sm',
         isFollowing
           ? 'bg-gray-100 text-gray-700 hover:bg-error-50 hover:text-error-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-error-500/10 dark:hover:text-error-500'
