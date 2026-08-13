@@ -7,17 +7,20 @@ import { LoadingSpinner } from '@/components/ui/States';
 import { notificationService } from '@/services';
 import { timeAgo, cn } from '@/utils/format';
 import type { Notification } from '@/types';
+import { useAuth } from '@/auth/AuthProvider';
 
 export function NotificationsPage() {
+  const { user } = useAuth();
+  const userId=user?.id;
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    notificationService.getAll().then((n) => {
-      setNotifications(n);
-      setLoading(false);
-    });
-  }, []);
+    let active=true;setNotifications([]);setLoading(true);
+    if(!userId){setLoading(false);return()=>{active=false;};}
+    void notificationService.getAll().then((n) => {if(active)setNotifications(n);}).finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;};
+  }, [userId]);
 
   const markAllRead = () => {
     notificationService.markAllRead().then(() => {

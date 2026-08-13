@@ -13,7 +13,7 @@ export function BusinessDashboard() {
   const [requests, setRequests] = useState<BillRequest[]>([]); const [bills, setBills] = useState<FounderBill[]>([]); const [selected, setSelected] = useState<BillRequest | null>(null); const [amount, setAmount] = useState(''); const [error, setError] = useState('');
   const [wallet,setWallet]=useState<CoinWallet>({balance:0,earned:0,redeemed:0,transactions:[]});
   const [saving, setSaving] = useState(false); const savingRef = useRef(false);
-  const load = () => Promise.all([founderV2Service.getOwnerRequests(), founderV2Service.getOwnerBills(),ownerBusiness?founderV2Service.getCoinWallet(ownerBusiness.businessId):Promise.resolve(wallet)]).then(([r,b,w]) => { setRequests(r); setBills(b);setWallet(w); }).catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load your business data.'));
+  const load = () => ownerBusiness?Promise.all([founderV2Service.getOwnerRequests(ownerBusiness.businessId), founderV2Service.getOwnerBills(ownerBusiness.businessId),founderV2Service.getCoinWallet(ownerBusiness.businessId)]).then(([r,b,w]) => { setRequests(r); setBills(b);setWallet(w); }).catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load your business data.')):Promise.resolve();
   // AuthGate resolves the owner business before mounting this route.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void load(); }, []);

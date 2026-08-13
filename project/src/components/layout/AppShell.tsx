@@ -45,21 +45,21 @@ export function AppShell({ children, showNav = true, maxWidth = 'feed' }: AppShe
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-      {isBackendMode && user && <RealtimeCenter />}
+      {isBackendMode && user && <RealtimeCenter key={user.id} />}
       <div className="hidden lg:block">
         <DesktopSidebar role={role}>
           <div className="sticky top-0 z-20 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-3 dark:border-gray-800 dark:bg-gray-950">
             {isBackendMode ? <span className="text-sm text-gray-500">{user?.email}</span> : <DevPreviewSwitcher role={role} setRole={setRole} compact />}
             <ThemeToggle theme={theme} setTheme={setTheme} />
           </div>
-          <div className="p-4">
+          <div key={user?.id ?? 'guest'} className="p-4">
             <div className={cn(maxW)}>{children}</div>
           </div>
         </DesktopSidebar>
       </div>
       <div className="lg:hidden">
-        <TopNavigation role={role} />
-        <div className={cn('min-w-0 overflow-x-hidden px-3 py-4 pb-20', maxW)}>{children}</div>
+        <TopNavigation key={`mobile-nav:${user?.id ?? 'guest'}`} role={role} />
+        <div key={`mobile-content:${user?.id ?? 'guest'}`} className={cn('min-w-0 overflow-x-hidden px-3 py-4 pb-20', maxW)}>{children}</div>
       </div>
       {showNav && <MobileNavigation role={role} />}
     </div>

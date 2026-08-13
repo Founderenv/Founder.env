@@ -48,7 +48,7 @@ interface AuthContextValue {
   ownerBusiness: OwnerBusinessState | null;
   loading: boolean;
   isBackendMode: boolean;
-  signInWithGoogle: (requestedRole?: Exclude<DatabaseRole, 'admin'>) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signInWithPassword: (email: string, password: string) => Promise<AuthCompletion>;
   signUpWithPassword: (email: string, password: string, displayName: string, requestedRole: Exclude<DatabaseRole, 'admin'>) => Promise<AuthCompletion>;
   chooseRole: (role: Exclude<DatabaseRole, 'admin'>) => Promise<void>;
@@ -176,13 +176,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     isBackendMode: dataMode === 'supabase',
 
-    signInWithGoogle: async (requestedRole = 'customer') => {
+    signInWithGoogle: async () => {
       if (!supabase) throw new Error('Supabase is not configured.');
-      // Store intended role in sessionStorage
-      try { sessionStorage.setItem(OAUTH_ROLE_INTENT_KEY, requestedRole); } catch { /* ignore */ }
+      // Google authentication is customer-only. Existing database roles are never overwritten.
+      try { sessionStorage.setItem(OAUTH_ROLE_INTENT_KEY, 'customer'); } catch { /* ignore */ }
       
       const callbackUrl = `${window.location.origin}/auth/callback`;
-      console.log(`[Google Auth] Initiating OAuth for role: ${requestedRole}, redirectTo: ${callbackUrl}`);
+      console.log(`[Google Auth] Initiating customer OAuth, redirectTo: ${callbackUrl}`);
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -253,8 +253,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try { sessionStorage.removeItem(OAUTH_ROLE_INTENT_KEY); } catch { /* ignore */ }
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      setSession(null);
       setProfile(null);
       setOwnerBusiness(null);
+      window.dispatchEvent(new CustomEvent('founder:identity-cleared'));
     },
 
     refreshProfile: async () => {
@@ -273,13 +275,11 @@ export function useAuth() {
 }
 
 /** Read and consume the OAuth role intent from sessionStorage (one-time use). */
-export function consumeOAuthRoleIntent(): Exclude<DatabaseRole, 'admin'> | null {
+export function consumeOAuthRoleIntent(): 'customer' | null {
   try {
     const stored = sessionStorage.getItem(OAUTH_ROLE_INTENT_KEY);
-    if (stored === 'customer' || stored === 'business_owner') {
-      sessionStorage.removeItem(OAUTH_ROLE_INTENT_KEY);
-      return stored;
-    }
+    sessionStorage.removeItem(OAUTH_ROLE_INTENT_KEY);
+    if (stored === 'customer') return stored;
   } catch { /* ignore */ }
   return null;
 }

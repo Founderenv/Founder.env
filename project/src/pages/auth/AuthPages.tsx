@@ -73,7 +73,7 @@ export function AuthPage() {
           id="auth-google-customer"
           onClick={() => {
             setError('');
-            auth.signInWithGoogle('customer').catch((caught) => {
+            auth.signInWithGoogle().catch((caught) => {
               const msg = caught instanceof Error ? caught.message : 'Google sign-in failed';
               setError(msg);
             });
@@ -248,30 +248,7 @@ export function BusinessAuthPage() {
             : 'Sign in to your business owner account.'}
         </p>
 
-        {/* Google OAuth — stores 'business_owner' intent for callback */}
-        <button
-          type="button"
-          id="auth-google-business"
-          onClick={() => {
-            setError('');
-            auth.signInWithGoogle('business_owner').catch((caught) => {
-              const msg = caught instanceof Error ? caught.message : 'Google sign-in failed';
-              setError(msg);
-            });
-          }}
-          className="btn-outline mt-5 w-full flex items-center justify-center gap-2"
-        >
-          <GoogleIcon />
-          Continue as Business Owner with Google
-        </button>
-
-        <div className="my-5 flex items-center gap-3">
-          <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
-          <span className="text-xs text-gray-400">or email</span>
-          <span className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
-        </div>
-
-        <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="space-y-3">
+        <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="mt-5 space-y-3">
           {signUp && (
             <input
               id="biz-auth-name"
@@ -312,7 +289,7 @@ export function BusinessAuthPage() {
             className="btn-primary mt-4 w-full"
           >
             {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Store size={16} />}
-            {signUp ? 'Create business account' : 'Sign in as owner'}
+            {signUp ? 'Create Business Account' : 'Sign in as owner'}
           </button>
         </form>
 
@@ -451,11 +428,11 @@ export function ChooseRolePage() {
     return <Navigate to={resolvePostAuthRoute(auth.profile, auth.ownerBusiness)} replace />;
   }
 
-  const choose = async (role: 'customer' | 'business_owner') => {
+  const choose = async () => {
     setSaving(true);
     setError('');
     try {
-      await auth.chooseRole(role);
+      await auth.chooseRole('customer');
       const completion = await auth.refreshProfile();
       navigate(completion.destination ?? '/customer', { replace: true });
     } catch (caught) {
@@ -466,28 +443,18 @@ export function ChooseRolePage() {
 
   return (
     <div className="mx-auto max-w-xl py-12 text-center">
-      <h1 className="text-2xl font-bold">How will you use Founder.env?</h1>
-      <p className="mt-2 text-sm text-gray-500">Choose your account type to continue.</p>
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <h1 className="text-2xl font-bold">Continue to Founder.env</h1>
+      <p className="mt-2 text-sm text-gray-500">Google authentication creates a customer account. Business owners register with email and password.</p>
+      <div className="mx-auto mt-6 max-w-sm">
         <button
           id="choose-role-customer"
           disabled={saving}
-          onClick={() => void choose('customer')}
+          onClick={() => void choose()}
           className="card p-6 text-left hover:border-brand-500 transition-colors"
         >
           <User className="text-brand-600" />
           <h2 className="mt-4 font-semibold">Customer</h2>
           <p className="mt-1 text-sm text-gray-500">Follow businesses, claim deals and earn rewards.</p>
-        </button>
-        <button
-          id="choose-role-owner"
-          disabled={saving}
-          onClick={() => void choose('business_owner')}
-          className="card p-6 text-left hover:border-brand-500 transition-colors"
-        >
-          <Store className="text-brand-600" />
-          <h2 className="mt-4 font-semibold">Business owner</h2>
-          <p className="mt-1 text-sm text-gray-500">Create and manage a business presence.</p>
         </button>
       </div>
       {saving && (

@@ -5,11 +5,12 @@ import { BillSheet } from '@/components/billing/BillSheet';
 import { FECoinWallet } from '@/components/rewards/FECoinWallet';
 import { founderV2Service, type CoinWallet, type FounderBill } from '@/services/v2Service';
 import { formatCurrency } from '@/utils/format';
+import { useAuth } from '@/auth/AuthProvider';
 
 const emptyWallet:CoinWallet={balance:0,earned:0,redeemed:0,transactions:[]};
-export function CustomerDashboard(){const[bills,setBills]=useState<FounderBill[]>([]),[wallet,setWallet]=useState<CoinWallet>(emptyWallet),[openBill,setOpenBill]=useState<FounderBill|null>(null),[error,setError]=useState('');const[params,setParams]=useSearchParams();
+export function CustomerDashboard(){const{user}=useAuth();const userId=user?.id;const[bills,setBills]=useState<FounderBill[]>([]),[wallet,setWallet]=useState<CoinWallet>(emptyWallet),[openBill,setOpenBill]=useState<FounderBill|null>(null),[error,setError]=useState('');const[params,setParams]=useSearchParams();
   const load=useCallback(async()=>{try{const[nextBills,nextWallet]=await Promise.all([founderV2Service.getMyBills(),founderV2Service.getCoinWallet()]);setBills(nextBills);setWallet(nextWallet);const requested=params.get('bill');if(requested){setOpenBill(nextBills.find((item)=>item.id===requested)??null);setParams({}, {replace:true});}}catch(caught){setError(caught instanceof Error?caught.message:'Could not load your account.');}},[params,setParams]);
-  useEffect(()=>{void load();},[load]);useEffect(()=>{const refresh=()=>void load();window.addEventListener('founder:notifications-changed',refresh);return()=>window.removeEventListener('founder:notifications-changed',refresh);},[load]);
+  useEffect(()=>{setBills([]);setWallet(emptyWallet);setOpenBill(null);setError('');if(userId)void load();},[load,userId]);useEffect(()=>{const refresh=()=>void load();window.addEventListener('founder:notifications-changed',refresh);return()=>window.removeEventListener('founder:notifications-changed',refresh);},[load]);
   const pending=bills.filter((item)=>item.paymentStatus!=='paid'&&item.status!=='cancelled'),savings=bills.reduce((sum,item)=>sum+item.memberDiscount+item.coinDiscount,0);
   return <div className="mx-auto max-w-content pb-10"><p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Founder.env member</p><h1 className="mt-1 text-2xl font-bold">Your Founder benefits</h1>{error&&<p className="mt-3 rounded-xl bg-error-50 p-3 text-sm text-error-600">{error}</p>}<div className="mt-5 grid gap-3 sm:grid-cols-3"><Metric icon={Coins} label="FE Coins" value={`${wallet.balance.toFixed(2)} FE`}/><Metric icon={ReceiptText} label="Founder savings" value={formatCurrency(savings)}/><Metric icon={Store} label="Pending bills" value={String(pending.length)}/></div>
     <div className="mt-6"><FECoinWallet wallet={wallet}/></div>
