@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, CreditCard, Image as ImageIcon, MapPin, Store, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, CreditCard, Image as ImageIcon, MapPin, Store, Loader2, Users, Gift } from 'lucide-react';
 import { businessService, categoryService } from '@/services';
 import { dataMode } from '@/lib/supabase';
 import { useAuth } from '@/auth/AuthProvider';
+import { referralRewardsService } from '@/services/referralRewardsService';
 import type { Category } from '@/types';
 import { cn } from '@/utils/format';
 
-const steps = ['Account', 'Business', 'Username', 'Category', 'Logo', 'Cover', 'Location', 'Contact', 'Preview', 'Activate'];
+const steps = ['Account', 'Business', 'Username', 'Category', 'Logo', 'Cover', 'Location', 'Contact', 'Preview', 'Referral', 'Activate'];
 
 interface Draft {
   name: string;
@@ -33,6 +34,18 @@ export function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Business is created once, just before the Referral step (so a referral can
+  // be attached before the ₹299 payment), then finalised at the Activate step.
+  const [businessId, setBusinessId] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+
+  // Referral state
+  const [referralCode, setReferralCode] = useState('');
+  const [appliedCode, setAppliedCode] = useState('');
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralMessage, setReferralMessage] = useState('');
+  const [referralError, setReferralError] = useState('');
 
   const [draft, setDraft] = useState<Draft>(
     dataMode === 'mock'
@@ -76,46 +89,69 @@ export function OnboardingPage() {
 
   const update = (key: keyof Draft, value: string) => setDraft((d) => ({ ...d, [key]: value }));
 
-  const handleSaveBusiness = async () => {
-    if (savingRef.current) return;
+  const buildInput = () => ({
+    name: draft.name,
+    username: draft.username,
+    category: draft.category,
+    location: draft.location,
+    address: draft.address || draft.location,
+    phone: draft.phone,
+    whatsapp: draft.whatsapp,
+    email: draft.email,
+    description: draft.description,
+    templateId: 'minimal_premium' as const,
+    servicesSummary: draft.services,
+    preferredContentLanguage: draft.preferredLanguage,
+  });
+
+  const ensureBusiness = async (): Promise<string> => {
+    if (businessId) return businessId;
     if (!draft.name.trim() || !draft.username.trim()) {
       setStatusMessage({ type: 'error', text: 'Business name and username are required.' });
-      return;
+      throw new Error('Business name and username are required.');
     }
+    setPreparing(true);
+    setStatusMessage(null);
+    try {
+      const created = await businessService.create(buildInput(), {
+        logo: logoFile || undefined,
+        cover: coverFile || undefined,
+      });
+      setBusinessId(created.id);
+      return created.id;
+    } finally {
+      setPreparing(false);
+    }
+  };
 
+  async function applyReferral(code: string | null) {
+    setReferralBusy(true);
+    setReferralMessage('');
+    setReferralError('');
+    try {
+      const id = await ensureBusiness();
+      const applied = await referralRewardsService.applyToBusiness(id, code);
+      setAppliedCode(applied ? referralCode.trim().toUpperCase() : '');
+      setReferralMessage(applied ? 'Referral code applied ✓' : 'Referral code removed.');
+    } catch (cause) {
+      setReferralError(cause instanceof Error ? cause.message : 'Invalid referral code.');
+    } finally {
+      setReferralBusy(false);
+    }
+  }
+
+  const handleSaveBusiness = async () => {
+    if (savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     setStatusMessage(null);
     try {
-      await businessService.create(
-        {
-          name: draft.name,
-          username: draft.username,
-          category: draft.category,
-          location: draft.location,
-          address: draft.address || draft.location,
-          phone: draft.phone,
-          whatsapp: draft.whatsapp,
-          email: draft.email,
-          description: draft.description,
-          templateId: 'minimal_premium',
-          servicesSummary: draft.services,
-          preferredContentLanguage: draft.preferredLanguage,
-        },
-        {
-          logo: logoFile || undefined,
-          cover: coverFile || undefined,
-        }
-      );
-      // Mark onboarding as complete in the database now that the business
-      // record exists. This sets profile.onboarding_complete = true.
+      // Business already exists (created at the Referral step); finalise setup.
+      await ensureBusiness();
       if (dataMode === 'supabase') {
         await completeBusinessOnboarding();
       }
-      setStatusMessage({
-        type: 'success',
-        text: 'Business profile saved! Opening your dashboard…',
-      });
+      setStatusMessage({ type: 'success', text: 'Business profile saved! Opening your dashboard…' });
       navigate('/business/dashboard', { replace: true });
     } catch (err: unknown) {
       setStatusMessage({ type: 'error', text: (err as Error).message || 'Failed to save business profile.' });
@@ -171,7 +207,8 @@ export function OnboardingPage() {
           </div>
         )}
         {step === 8 && <Preview draft={draft} logoFile={logoFile} coverFile={coverFile} />}
-        {step === 9 && <Activation onSave={handleSaveBusiness} saving={saving} />}
+        {step === 9 && <ReferralStep preparing={preparing} referralCode={referralCode} setReferralCode={setReferralCode} appliedCode={appliedCode} referralBusy={referralBusy} referralMessage={referralMessage} referralError={referralError} onApply={applyReferral} onSkip={async () => { setReferralMessage(''); setReferralError(''); await ensureBusiness(); }} />}
+        {step === 10 && <Activation onSave={handleSaveBusiness} saving={saving} />}
       </div>
 
       <div className="mt-5 flex items-center justify-between">
@@ -179,8 +216,22 @@ export function OnboardingPage() {
           <ArrowLeft size={16} /> Back
         </button>
         {step < steps.length - 1 ? (
-          <button onClick={() => setStep((s) => Math.min(steps.length - 1, s + 1))} className="btn-primary">
-            Continue <ArrowRight size={16} />
+          <button
+            onClick={async () => {
+              if (step === steps.length - 2) {
+                setPreparing(true);
+                try { await ensureBusiness(); setStep((s) => Math.min(steps.length - 1, s + 1)); }
+                catch { /* ensureBusiness surfaces the error via statusMessage */ }
+                finally { setPreparing(false); }
+              } else {
+                setStep((s) => Math.min(steps.length - 1, s + 1));
+              }
+            }}
+            disabled={preparing}
+            className="btn-primary"
+          >
+            {preparing ? <Loader2 size={16} className="animate-spin" /> : null}
+            {preparing ? 'Preparing…' : <>Continue <ArrowRight size={16} /></>}
           </button>
         ) : (
           <button onClick={handleSaveBusiness} disabled={saving} className="btn-primary">
@@ -306,6 +357,60 @@ function Preview({ draft, logoFile, coverFile }: { draft: Draft; logoFile: File 
   );
 }
 
+function ReferralStep({
+  preparing, referralCode, setReferralCode, appliedCode, referralBusy, referralMessage, referralError, onApply, onSkip,
+}: {
+  preparing: boolean;
+  referralCode: string;
+  setReferralCode: (v: string) => void;
+  appliedCode: string;
+  referralBusy: boolean;
+  referralMessage: string;
+  referralError: string;
+  onApply: (code: string | null) => Promise<void>;
+  onSkip: () => Promise<void>;
+}) {
+  const [skipping, setSkipping] = useState(false);
+  return (
+    <div className="mx-auto max-w-lg">
+      <div className="text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10">
+          <Users size={24} />
+        </div>
+        <h2 className="mt-4 text-2xl font-bold">Were you referred by someone?</h2>
+        <p className="mt-1 text-sm text-gray-500">Optional — apply an E-Referral Code before paying.</p>
+      </div>
+      <div className="mt-6 rounded-2xl border border-gray-200 p-5 dark:border-gray-700">
+        <label className="block">
+          <span className="label">E-Referral Code</span>
+          <div className="flex gap-2">
+            <input
+              className="input uppercase"
+              placeholder="FE-XXXXXXXX"
+              value={referralCode}
+              disabled={preparing || referralBusy}
+              onChange={(event) => { setReferralCode(event.target.value.toUpperCase()); }}
+            />
+            <button disabled={referralBusy || !referralCode.trim() || preparing} onClick={() => void onApply(referralCode)} className="btn-outline shrink-0">
+              {referralBusy ? <Loader2 size={14} className="animate-spin" /> : null}Apply Code
+            </button>
+          </div>
+        </label>
+        <p className="mt-3 text-xs leading-5 text-gray-500">Referral codes support the person who introduced you to Founder.env. Your Founder.env pricing remains unchanged — ₹299 today, ₹199/month later.</p>
+        {referralMessage && <p className="mt-2 flex items-center gap-1 text-sm font-semibold text-green-600"><Check size={15} />{referralMessage}</p>}
+        {referralError && <p className="mt-2 text-sm font-medium text-error-600">{referralError} — you can correct the code or skip.</p>}
+        {appliedCode && (
+          <button disabled={referralBusy || preparing} onClick={() => void onApply(null)} className="mt-3 text-xs font-semibold text-gray-500">Remove referral</button>
+        )}
+        <div className="mt-4 flex items-center gap-2 text-xs text-gray-400"><Gift size={14} className="text-brand-600" /><span>Your referring customer earns a reward only after your ₹299 setup payment is verified and your business activates.</span></div>
+      </div>
+      <button disabled={referralBusy || preparing || skipping} onClick={() => void (async () => { setSkipping(true); try { await onSkip(); } finally { setSkipping(false); } })()} className="btn-ghost mt-3 w-full">
+        {skipping ? <Loader2 size={14} className="animate-spin" /> : null}Skip referral
+      </button>
+    </div>
+  );
+}
+
 function Activation({ onSave, saving }: { onSave: () => void; saving: boolean }) {
   return (
     <div className="mx-auto max-w-lg">
@@ -325,7 +430,7 @@ function Activation({ onSave, saving }: { onSave: () => void; saving: boolean })
           <p className="text-xl font-bold text-brand-600">Pending</p>
         </div>
         <div className="mt-5 space-y-2">
-          {['Permanent business draft created', 'Upload logo and cover to storage', 'Edit profile anytime', 'Ready for Razorpay activation phase'].map((item) => (
+          {['Permanent business draft created', 'Upload logo and cover to storage', 'Edit profile anytime', 'Ready for payment & activation'].map((item) => (
             <p key={item} className="flex items-center gap-2 text-sm">
               <Check size={16} className="text-brand-600" />
               {item}
