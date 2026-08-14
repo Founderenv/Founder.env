@@ -34,6 +34,7 @@ const BusinessDashboard = lazy(() => import('@/pages/owner/BusinessDashboard').t
 const AIContentStudioPage = lazy(() => import('@/pages/owner/AIContentStudioPage').then((m) => ({ default: m.AIContentStudioPage })));
 const ContentProPage = lazy(() => import('@/pages/owner/AIContentStudioPage').then((m) => ({ default: m.ContentProPage })));
 const PostDetailPage = lazy(() => import('@/pages/customer/PostDetailPage').then((m) => ({ default: m.PostDetailPage })));
+const LandingPage = lazy(() => import('@/pages/landing/LandingPage').then((m) => ({ default: m.LandingPage })));
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 function PageSkeleton() {
@@ -48,8 +49,8 @@ function PageSkeleton() {
 /**
  * Root entry (`/`).
  *
- * For unauthenticated visitors the Founder.env Welcome/Auth page is the first
- * screen — they must NOT land on Home/discovery before authenticating.
+ * For unauthenticated visitors the original full Founder.env landing page is
+ * the first screen — they must NOT land on discovery Home or an auth-only form.
  * Authenticated users are routed to their correct role destination based on
  * profile role and onboarding/activation state. Shared/public routes live on
  * their own paths and are untouched.
@@ -61,17 +62,18 @@ function Home() {
   // Non-backend (mock) mode: use legacy role switcher
   if (!isBackendMode) {
     if (role === 'admin') return <Navigate to="/admin" replace />;
+    if (role === 'guest') return <LandingPage />;
     return <ExplorePage />;
   }
 
   // Backend mode with session still loading — show skeleton, not blank
   if (loading) return <PageSkeleton />;
 
-  // Unauthenticated visitor → Welcome/Auth is the first screen
-  if (!user) return <Navigate to="/auth" replace />;
-
   // Authenticated but profile still resolving — keep waiting, never treat as logged out
-  if (!profile) return <PageSkeleton />;
+  if (user && !profile) return <PageSkeleton />;
+
+  // Unauthenticated visitor → original full Founder.env landing page first
+  if (!user) return <LandingPage />;
 
   // Authenticated → route to the correct role destination (no auth page re-shown)
   return <Navigate to={resolvePostAuthRoute(profile, ownerBusiness)} replace />;
