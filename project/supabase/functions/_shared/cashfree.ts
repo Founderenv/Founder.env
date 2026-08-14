@@ -43,16 +43,26 @@ export function cashfreeBaseUrl(env: CashfreeEnv['env']) {
 
 /** Generic Cashfree API call. Never exposes the client secret to the caller. */
 export async function cashfreeApi(env: CashfreeEnv, path: string, method = 'GET', body?: JsonRecord): Promise<JsonRecord> {
-  const response = await fetch(`${cashfreeBaseUrl(env.env)}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'x-client-id': env.clientId,
-      'x-client-secret': env.clientSecret,
-      'x-api-version': env.apiVersion,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const timeoutMs = 10_000;
+  let response: Response;
+  try {
+    response = await fetch(`${cashfreeBaseUrl(env.env)}${path}`, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': env.clientId,
+        'x-client-secret': env.clientSecret,
+        'x-api-version': env.apiVersion,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      throw new Error(`Cashfree request timed out after ${Math.round(timeoutMs / 1000)}s (${path})`);
+    }
+    throw new Error(`Cashfree request failed (${path}): ${error instanceof Error ? error.message : 'network error'}`);
+  }
   const result = (await response.json().catch(() => ({}))) as JsonRecord;
   if (!response.ok) {
     const message = stringValue((result as { message?: string })?.message) || stringValue(result.error) || `Cashfree request failed (${response.status})`;

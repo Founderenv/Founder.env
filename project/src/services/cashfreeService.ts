@@ -26,7 +26,16 @@ declare global { interface Window { Cashfree?: CashfreeConstructor; } }
 
 async function invoke<T>(body: Record<string, string>) {
   const { data, error } = await requireSupabase().functions.invoke<T>('cashfree-subscription', { body });
-  if (error) throw new Error(error.message || 'Subscription request failed');
+  if (error) {
+    const message = error.message || 'Subscription request failed';
+    if (/failed to send a request to the edge function/i.test(message)) {
+      throw new Error('Unable to reach the payment service. Please check your connection and try again.');
+    }
+    if (/non-2xx/i.test(message)) {
+      throw new Error('Payment service is temporarily unavailable. Please try again shortly.');
+    }
+    throw new Error(message);
+  }
   return data as T;
 }
 
