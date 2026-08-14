@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
-  addOneCalendarMonth, cashfreeApi, cashfreeEnv, MONTHLY_FEE, SETUP_FEE, TOTAL_COUNT,
+  addOneCalendarMonth, cashfreeApi, cashfreeEnv, CashfreeProviderError, MONTHLY_FEE, SETUP_FEE, TOTAL_COUNT,
 } from '../_shared/cashfree.ts';
 
 const cors = {
@@ -33,6 +33,9 @@ Deno.serve(async (request) => {
     if (body.action === 'status') return getStatus(admin, business.id);
     return json({ error: 'Unsupported action' }, 400);
   } catch (error) {
+    if (error instanceof CashfreeProviderError) {
+      return json({ error: error.message, provider: error.provider }, 500);
+    }
     const message = error instanceof Error ? error.message : 'Unexpected error';
     console.error('Cashfree subscription request failed:', message);
     return json({ error: message }, 500);

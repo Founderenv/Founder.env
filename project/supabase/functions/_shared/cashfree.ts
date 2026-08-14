@@ -41,9 +41,28 @@ export function cashfreeBaseUrl(env: CashfreeEnv['env']) {
   return env === 'production' ? 'https://api.cashfree.com/pg' : 'https://sandbox.cashfree.com/pg';
 }
 
+/** Safe diagnostic context for a Cashfree provider failure. Never contains secrets. */
+export interface CashfreeProviderErrorInfo {
+  status: number | null;
+  providerCode: string;
+  providerMessage: string;
+  path: string;
+  elapsedMs: number;
+}
+
+export class CashfreeProviderError extends Error {
+  readonly provider: CashfreeProviderErrorInfo;
+  constructor(info: CashfreeProviderErrorInfo, message: string) {
+    super(message);
+    this.name = 'CashfreeProviderError';
+    this.provider = info;
+  }
+}
+
 /** Generic Cashfree API call. Never exposes the client secret to the caller. */
 export async function cashfreeApi(env: CashfreeEnv, path: string, method = 'GET', body?: JsonRecord): Promise<JsonRecord> {
   const timeoutMs = 10_000;
+  const startedAt = Date.now();
   let response: Response;
   try {
     response = await fetch(`${cashfreeBaseUrl(env.env)}${path}`, {
@@ -58,15 +77,21 @@ export async function cashfreeApi(env: CashfreeEnv, path: string, method = 'GET'
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
+    const elapsedMs = Date.now() - startedAt;
     if (error instanceof Error && error.name === 'TimeoutError') {
-      throw new Error(`Cashfree request timed out after ${Math.round(timeoutMs / 1000)}s (${path})`);
+      throw new CashfreeProviderError({ status: null, providerCode: 'timeout', providerMessage: 'request timed out', path, elapsedMs }, `Cashfree request timed out after ${Math.round(timeoutMs / 1000)}s (${path})`);
     }
-    throw new Error(`Cashfree request failed (${path}): ${error instanceof Error ? error.message : 'network error'}`);
+    const detail = error instanceof Error ? error.message : 'network error';
+    throw new CashfreeProviderError({ status: null, providerCode: 'network_error', providerMessage: detail, path, elapsedMs }, `Cashfree request failed (${path}): ${detail}`);
   }
+  const elapsedMs = Date.now() - startedAt;
   const result = (await response.json().catch(() => ({}))) as JsonRecord;
   if (!response.ok) {
-    const message = stringValue((result as { message?: string })?.message) || stringValue(result.error) || `Cashfree request failed (${response.status})`;
-    throw new Error(message);
+    const resultCode = stringValue(result.code);
+    const resultType = stringValue(result.type);
+    const providerCode = resultType || resultCode || `http_${response.status}`;
+    const providerMessage = stringValue((result as { message?: string })?.message) || resultCode || `HTTP ${response.status}`;
+    throw new CashfreeProviderError({ status: response.status, providerCode, providerMessage, path, elapsedMs }, providerMessage);
   }
   return result;
 }

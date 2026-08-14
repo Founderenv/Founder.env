@@ -24,10 +24,17 @@ interface CashfreeSdkInstance {
 interface CashfreeConstructor { new(options: { mode: string }): CashfreeSdkInstance; }
 declare global { interface Window { Cashfree?: CashfreeConstructor; } }
 
+interface FunctionsErrorLike { message?: string; context?: { provider?: { code?: string; status?: number | null }; error?: string } }
+
 async function invoke<T>(body: Record<string, string>) {
   const { data, error } = await requireSupabase().functions.invoke<T>('cashfree-subscription', { body });
   if (error) {
     const message = error.message || 'Subscription request failed';
+    const provider = (error as FunctionsErrorLike)?.context?.provider;
+    if (provider?.code && provider.code !== 'timeout') {
+      const status = typeof provider.status === 'number' ? ` (${provider.status})` : '';
+      throw new Error(`Payment provider error: ${provider.code}${status}`);
+    }
     if (/failed to send a request to the edge function/i.test(message)) {
       throw new Error('Unable to reach the payment service. Please check your connection and try again.');
     }
