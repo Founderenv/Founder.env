@@ -71,3 +71,18 @@ test('FE Wallet remains separate from INR referral earnings', () => {
   assert.doesNotMatch(migration, /fe_coin_accounts|fe_coin_transactions|reward_claims/);
   assert.match(dashboard, /Available for payout/);
 });
+
+test('onboarding resolves the owned business before inserting, so referral apply/skip never duplicates', () => {
+  const source = readFileSync(new URL('../src/pages/owner/OnboardingPage.tsx', import.meta.url), 'utf8');
+  // Referral is its own step immediately before Activate/payment.
+  assert.match(source, /'Referral', 'Activate'/);
+  // ensureBusiness reuses an existing owned business instead of inserting a duplicate.
+  assert.match(source, /getByOwner\(user\.id\)/);
+  assert.match(source, /businessIdRef\.current = owned\[0\]\.id/);
+  assert.match(source, /businessService\.create/);
+  // The owned-business resolve must precede the create so a refresh/back can
+  // never trigger a second INSERT of the same username.
+  const resolve = source.indexOf('getByOwner');
+  const create = source.indexOf('businessService.create');
+  assert.ok(resolve !== -1 && create !== -1 && resolve < create, 'owned business must be resolved before create');
+});

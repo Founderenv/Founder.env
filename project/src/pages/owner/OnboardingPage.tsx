@@ -26,7 +26,7 @@ interface Draft {
 
 export function OnboardingPage() {
   const navigate = useNavigate();
-  const { completeBusinessOnboarding } = useAuth();
+  const { user, completeBusinessOnboarding } = useAuth();
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -35,9 +35,13 @@ export function OnboardingPage() {
   const savingRef = useRef(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Business is created once, just before the Referral step (so a referral can
-  // be attached before the ₹299 payment), then finalised at the Activate step.
-  const [businessId, setBusinessId] = useState<string | null>(null);
+  // Business is created ONCE for the onboarding, just before the Referral step
+  // (so a referral can be attached before the ₹299 payment), then finalised at
+  // the Activate step. businessIdRef survives re-renders and re-entrancy. The
+  // in-memory value can be lost on refresh/back, so ensureBusiness re-resolves
+  // the owned business server-side instead of inserting a duplicate.
+  const businessIdRef = useRef<string | null>(null);
+  const inFlightBusiness = useRef<Promise<string> | null>(null);
   const [preparing, setPreparing] = useState(false);
 
   // Referral state
@@ -105,23 +109,34 @@ export function OnboardingPage() {
   });
 
   const ensureBusiness = async (): Promise<string> => {
-    if (businessId) return businessId;
+    if (businessIdRef.current) return businessIdRef.current;
     if (!draft.name.trim() || !draft.username.trim()) {
       setStatusMessage({ type: 'error', text: 'Business name and username are required.' });
       throw new Error('Business name and username are required.');
     }
-    setPreparing(true);
-    setStatusMessage(null);
-    try {
+    if (inFlightBusiness.current) return inFlightBusiness.current;
+    const task = (async () => {
+      setPreparing(true);
+      setStatusMessage(null);
+      // ONE business owner => ONE business record. If a business already exists
+      // for the current owner (e.g. businessId state was lost after refresh or
+      // back-navigation), reuse it rather than inserting a duplicate username.
+      if (dataMode === 'supabase' && user?.id) {
+        const owned = await businessService.getByOwner(user.id);
+        if (owned && owned.length) {
+          businessIdRef.current = owned[0].id;
+          return owned[0].id;
+        }
+      }
       const created = await businessService.create(buildInput(), {
         logo: logoFile || undefined,
         cover: coverFile || undefined,
       });
-      setBusinessId(created.id);
+      businessIdRef.current = created.id;
       return created.id;
-    } finally {
-      setPreparing(false);
-    }
+    })().finally(() => { inFlightBusiness.current = null; setPreparing(false); });
+    inFlightBusiness.current = task;
+    return task;
   };
 
   async function applyReferral(code: string | null) {
