@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Bookmark, Star, Gift, MessageCircle, Users, ChevronRight, Bell } from 'lucide-react';
+import { Settings, Bookmark, Star, Gift, MessageCircle, Users, ChevronRight, Bell, Camera, WalletCards } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { BusinessCard } from '@/components/business/BusinessCard';
 import { ReviewCard } from '@/components/social/ReviewCard';
@@ -9,6 +9,7 @@ import { useCurrentCustomer } from '@/hooks/useCurrentCustomer';
 import { customerService, followService, reviewService } from '@/services';
 import { useAuth } from '@/auth/AuthProvider';
 import type { Business, CustomerAccount, Review } from '@/types';
+import { ProfilePhotoEditor } from '@/components/customer/ProfilePhotoEditor';
 
 export function AccountPage() {
   const { setRole } = useRole();
@@ -17,6 +18,7 @@ export function AccountPage() {
   const [currentCustomer, setCurrentCustomer] = useState<CustomerAccount>(identity);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [editingPhoto, setEditingPhoto] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -33,9 +35,9 @@ export function AccountPage() {
   const sections = [
     { to: '#following', icon: Users, label: 'Following', count: currentCustomer.followingCount },
     { to: '/saved', icon: Bookmark, label: 'Saved', count: currentCustomer.savedCount },
-    { to: '/rewards', icon: Gift, label: 'Rewards', count: currentCustomer.rewardsCount },
+    { to: '/rewards', icon: Gift, label: 'FE Wallet', count: currentCustomer.rewardsCount },
     { to: '#reviews', icon: Star, label: 'Reviews', count: currentCustomer.reviewsCount },
-    { to: '/referrals', icon: Users, label: 'Referrals' },
+    { to: '/referrals', icon: WalletCards, label: 'Refer & Earn' },
     { to: '/messages', icon: MessageCircle, label: 'Messages' },
     { to: '/notifications', icon: Bell, label: 'Notifications' },
   ];
@@ -45,9 +47,13 @@ export function AccountPage() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Account</h1>
 
       <div className="card p-6 text-center">
-        <Avatar src={currentCustomer.avatarUrl} alt={currentCustomer.displayName} size="xl" className="mx-auto" />
+        <button onClick={() => setEditingPhoto(true)} className="group relative mx-auto block" aria-label="Change profile photo">
+          <Avatar src={currentCustomer.avatarUrl} alt={currentCustomer.displayName} size="2xl" className="ring-4 ring-white shadow-md dark:ring-gray-900" />
+          <span className="absolute bottom-0 right-0 rounded-full bg-brand-600 p-2 text-white shadow"><Camera size={16} /></span>
+        </button>
         <h2 className="mt-3 text-lg font-bold text-gray-900 dark:text-gray-100">{currentCustomer.displayName}</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400">{currentCustomer.email}</p>
+        <button onClick={() => setEditingPhoto(true)} className="mt-3 rounded-lg border px-4 py-1.5 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800">Edit Profile</button>
         <div className="mt-4 flex justify-center gap-6">
           <div className="text-center">
             <p className="text-xl font-bold text-gray-900 dark:text-white">{currentCustomer.followingCount}</p>
@@ -100,6 +106,7 @@ export function AccountPage() {
       <p className="mt-6 text-center text-xs text-gray-400">
         Your account is private. Only your name and avatar are visible to businesses.
       </p>
+      <ProfilePhotoEditor open={editingPhoto} name={currentCustomer.displayName} currentUrl={currentCustomer.avatarUrl} onClose={() => setEditingPhoto(false)} onSaved={(avatarUrl) => setCurrentCustomer((customer) => ({ ...customer, avatarUrl }))} />
     </div>
   );
 }

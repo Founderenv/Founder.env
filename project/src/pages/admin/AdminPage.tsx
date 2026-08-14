@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { adminService } from '@/services';
 import type { AnalyticsMetric, Business, CustomerAccount, Payment, Report, Subscription } from '@/types';
 import { formatCurrency, formatDate, timeAgo } from '@/utils/format';
+import { referralRewardsService, type AdminReferralPayout } from '@/services/referralRewardsService';
 
 export function AdminPage() {
   const { section } = useParams();
@@ -13,6 +14,7 @@ export function AdminPage() {
   if (section === 'businesses') return <Businesses />;
   if (section === 'customers') return <Customers />;
   if (section === 'payments') return <Payments />;
+  if (section === 'payouts') return <ReferralPayouts />;
   if (section === 'subscriptions') return <Subscriptions />;
   if (section === 'content') return <Content />;
   if (section === 'reports') return <Reports />;
@@ -53,6 +55,14 @@ function Payments() {
   useEffect(() => { void adminService.getPayments().then(setPayments); }, []);
   const rows = payments.filter((p) => `${p.id} ${p.businessName}`.toLowerCase().includes(query.toLowerCase()));
   return <div><Header title="Payments" description="Activation and subscription payment records." /><Toolbar query={query} setQuery={setQuery} /><Table headings={['Payment ID', 'Business', 'Amount', 'Type', 'Status', 'Date']}>{rows.map((p) => <tr key={p.id}><Td>{p.id}</Td><Td><span className="font-semibold">{p.businessName}</span></Td><Td>{formatCurrency(p.amount)}</Td><Td><span className="capitalize">{p.type}</span></Td><Td><StatusBadge status={p.status} variant={p.status === 'success' ? 'success' : p.status === 'failed' ? 'error' : 'warning'} /></Td><Td>{formatDate(p.date)}</Td></tr>)}</Table></div>;
+}
+
+function ReferralPayouts() {
+  const [payouts, setPayouts] = useState<AdminReferralPayout[]>([]); const [busy, setBusy] = useState(''); const [error, setError] = useState('');
+  const load = () => referralRewardsService.getAdminPayouts().then(setPayouts).catch((cause) => setError(cause instanceof Error ? cause.message : 'Could not load payouts.'));
+  useEffect(() => { void load(); }, []);
+  async function update(id: string, status: 'paid' | 'rejected' | 'needs_review') { setBusy(id); setError(''); try { await referralRewardsService.updateAdminPayout(id, status); await load(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not update payout.'); } finally { setBusy(''); } }
+  return <div><Header title="Referral Payout Requests" description="Secure manual ₹150 payouts to the UPI destination snapshotted at request time." />{error && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}<Table headings={['Customer', 'Amount', 'UPI destination', 'Requested', 'Status', 'Actions']}>{payouts.map((item) => <tr key={item.id}><Td><span className="font-semibold">{item.customerName || item.customer_id.slice(0, 8)}</span>{item.payee_name_snapshot && <p className="text-xs text-gray-400">{item.payee_name_snapshot}</p>}</Td><Td>₹{item.amount_paise / 100}</Td><Td><span className="font-mono text-xs">{item.destination_upi_snapshot}</span></Td><Td>{formatDate(item.requested_at)}</Td><Td><StatusBadge status={item.status} variant={item.status === 'paid' ? 'success' : item.status === 'rejected' ? 'error' : 'warning'} /></Td><Td>{item.status === 'pending' || item.status === 'needs_review' ? <div className="flex gap-2"><button disabled={busy === item.id} onClick={() => void update(item.id, 'paid')} className="text-xs font-semibold text-green-600">Mark Paid</button><button disabled={busy === item.id} onClick={() => void update(item.id, 'needs_review')} className="text-xs font-semibold text-amber-600">Needs Review</button><button disabled={busy === item.id} onClick={() => void update(item.id, 'rejected')} className="text-xs font-semibold text-red-600">Reject</button></div> : <span className="text-xs text-gray-400">Finalized</span>}</Td></tr>)}</Table>{!payouts.length && <p className="mt-4 text-center text-sm text-gray-500">No referral payout requests yet.</p>}</div>;
 }
 
 function Subscriptions() {

@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { CalendarClock, CheckCircle2, CreditCard, Loader2, LogOut, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CalendarClock, Check, CheckCircle2, CreditCard, Loader2, LogOut, ShieldCheck, Users } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Logo } from '@/components/layout/Navigation';
 import { razorpaySubscriptionService } from '@/services/razorpayService';
+import { referralRewardsService } from '@/services/referralRewardsService';
 
 const features = ['Permanent public business profile', 'Unlimited QR code', 'Deals, stories, and posts', 'Customer follows and messages', 'Analytics dashboard', 'Cancel at the end of a billing cycle'];
 
@@ -10,6 +11,28 @@ export function PaymentPendingPage() {
   const { profile, ownerBusiness, signOut, refreshProfile } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [referralCode, setReferralCode] = useState('');
+  const [appliedCode, setAppliedCode] = useState('');
+  const [referralBusy, setReferralBusy] = useState(false);
+  const [referralMessage, setReferralMessage] = useState('');
+
+  useEffect(() => {
+    if (!ownerBusiness?.businessId) return;
+    void referralRewardsService.getBusinessReferral(ownerBusiness.businessId).then((referral) => {
+      if (referral) { setReferralCode(referral.referralCode); setAppliedCode(referral.referralCode); }
+    }).catch(() => undefined);
+  }, [ownerBusiness?.businessId]);
+
+  async function applyReferral(code: string | null) {
+    if (!ownerBusiness?.businessId) return;
+    setReferralBusy(true); setReferralMessage(''); setError('');
+    try {
+      const applied = await referralRewardsService.applyToBusiness(ownerBusiness.businessId, code);
+      setAppliedCode(applied ? referralCode.trim().toUpperCase() : '');
+      setReferralMessage(applied ? 'Referral code applied ✓' : 'Referral code removed.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Invalid referral code.'); }
+    finally { setReferralBusy(false); }
+  }
 
   async function subscribe() {
     setBusy(true); setError('');
@@ -34,6 +57,13 @@ export function PaymentPendingPage() {
           <p className="mt-3 text-sm leading-6 text-gray-500">Your profile is saved. Authorise Razorpay Autopay to activate <strong className="text-gray-800 dark:text-gray-200">{ownerBusiness?.businessName ?? 'your business'}</strong>.</p>
           <div className="mt-7 space-y-3">{features.map((feature) => <p key={feature} className="flex items-center gap-2.5 text-sm"><CheckCircle2 size={17} className="shrink-0 text-brand-600" />{feature}</p>)}</div>
           <div className="mt-7 flex items-start gap-3 rounded-2xl bg-brand-50 p-4 text-sm text-brand-900 dark:bg-brand-500/10 dark:text-brand-200"><ShieldCheck className="mt-0.5 shrink-0" size={19} /><p>Payment details and mandate authentication are handled by Razorpay. Founder.env never receives your card or UPI credentials.</p></div>
+          <div className="mt-5 rounded-2xl border border-gray-200 p-4 dark:border-gray-700">
+            <div className="flex items-center gap-2"><Users size={18} className="text-brand-600" /><h2 className="font-semibold">Were you referred by someone?</h2></div>
+            <label className="mt-3 block"><span className="label">E-Referral Code (Optional)</span><input className="input uppercase" placeholder="FE-________" value={referralCode} onChange={(event) => { setReferralCode(event.target.value); setReferralMessage(''); }} /></label>
+            <p className="mt-2 text-xs leading-5 text-gray-500">Referral codes support the person who introduced you to Founder.env. Your Founder.env pricing does not change.</p>
+            {referralMessage && <p className="mt-2 flex items-center gap-1 text-sm font-semibold text-green-600"><Check size={15} />{referralMessage}</p>}
+            <div className="mt-3 flex gap-2"><button disabled={referralBusy || !referralCode.trim()} onClick={() => void applyReferral(referralCode)} className="btn-outline text-xs">{referralBusy && <Loader2 size={14} className="animate-spin" />}Apply Code</button>{appliedCode && <button disabled={referralBusy} onClick={() => { setReferralCode(''); void applyReferral(null); }} className="px-3 text-xs font-semibold text-gray-500">Remove</button>}</div>
+          </div>
         </section>
         <aside className="bg-gray-950 p-7 text-white md:p-9">
           <p className="text-sm text-gray-400">Due today</p><div className="mt-1 flex items-end gap-2"><span className="text-5xl font-bold">₹299</span><span className="pb-1 text-sm text-gray-400">one-time setup</span></div>

@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test:e2e": "playwright test",
+    "test:referrals": "node --test --experimental-strip-types tests/customer-referrals.test.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },

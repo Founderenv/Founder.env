@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { cn } from '@/utils/format';
 
 interface AvatarProps {
@@ -18,6 +19,13 @@ const sizeMap = {
 };
 
 export function Avatar({ src, alt, size = 'md', className, ring }: AvatarProps) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (!src || failed) return (
+    <span aria-label={alt} role="img" className={cn('inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-indigo-700 font-bold uppercase text-white', sizeMap[size], ring && 'ring-2 ring-white dark:ring-gray-950', className)}>
+      {alt.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join('') || 'FE'}
+    </span>
+  );
   return (
     <img
       src={src}
@@ -29,6 +37,7 @@ export function Avatar({ src, alt, size = 'md', className, ring }: AvatarProps) 
         className
       )}
       loading="lazy"
+      onError={() => setFailed(true)}
     />
   );
 }

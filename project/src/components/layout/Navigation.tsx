@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut, Bell, WandSparkles } from 'lucide-react';
+import { Home, Compass, Tag, MessageCircle, User, Plus, BarChart3, Menu, X, LayoutDashboard, LogOut, Bell, WandSparkles, WalletCards } from 'lucide-react';
 import { type Role } from '@/types';
 import { cn } from '@/utils/format';
 import { useEffect, useState } from 'react';
@@ -152,6 +152,7 @@ const adminNav: NavItem[] = [
   { to: '/admin/businesses', label: 'Businesses', icon: Compass },
   { to: '/admin/customers', label: 'Customers', icon: User },
   { to: '/admin/payments', label: 'Payments', icon: Tag },
+  { to: '/admin/payouts', label: 'Referral Payouts', icon: WalletCards },
   { to: '/admin/subscriptions', label: 'Subscriptions', icon: BarChart3 },
   { to: '/admin/content', label: 'Content', icon: Menu },
   { to: '/admin/reports', label: 'Reports', icon: MessageCircle },
