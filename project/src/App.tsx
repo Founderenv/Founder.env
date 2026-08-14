@@ -3,7 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AppShell } from '@/components/layout/AppShell';
 import { FeedSkeleton } from '@/components/ui/States';
 import { useRole } from '@/hooks/useTheme';
-import { useAuth, type DatabaseRole } from '@/auth/AuthProvider';
+import { resolvePostAuthRoute, useAuth, type DatabaseRole } from '@/auth/AuthProvider';
 
 // ── Lazy imports ──────────────────────────────────────────────────────────────
 const ExplorePage = lazy(() => import('@/pages/customer/ExplorePage').then((m) => ({ default: m.ExplorePage })));
@@ -46,12 +46,17 @@ function PageSkeleton() {
 
 // ── Home component ────────────────────────────────────────────────────────────
 /**
- * Public network discovery is the Home surface for guests, customers, and
- * owners. Authentication redirects are handled only by protected routes.
+ * Root entry (`/`).
+ *
+ * For unauthenticated visitors the Founder.env Welcome/Auth page is the first
+ * screen — they must NOT land on Home/discovery before authenticating.
+ * Authenticated users are routed to their correct role destination based on
+ * profile role and onboarding/activation state. Shared/public routes live on
+ * their own paths and are untouched.
  */
 function Home() {
   const { role } = useRole();
-  const { loading, isBackendMode } = useAuth();
+  const { loading, isBackendMode, user, profile, ownerBusiness } = useAuth();
 
   // Non-backend (mock) mode: use legacy role switcher
   if (!isBackendMode) {
@@ -62,8 +67,14 @@ function Home() {
   // Backend mode with session still loading — show skeleton, not blank
   if (loading) return <PageSkeleton />;
 
-  if (role === 'admin') return <Navigate to="/admin" replace />;
-  return <ExplorePage />;
+  // Unauthenticated visitor → Welcome/Auth is the first screen
+  if (!user) return <Navigate to="/auth" replace />;
+
+  // Authenticated but profile still resolving — keep waiting, never treat as logged out
+  if (!profile) return <PageSkeleton />;
+
+  // Authenticated → route to the correct role destination (no auth page re-shown)
+  return <Navigate to={resolvePostAuthRoute(profile, ownerBusiness)} replace />;
 }
 
 // ── Auth Guard ────────────────────────────────────────────────────────────────
