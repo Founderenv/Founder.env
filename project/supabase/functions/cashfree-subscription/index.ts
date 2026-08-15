@@ -24,7 +24,7 @@ Deno.serve(async (request) => {
     const admin = createClient(env.supabaseUrl, env.serviceKey, { auth: { persistSession: false } });
     const body = await request.json() as { action?: string; subscriptionId?: string };
 
-    const { data: profile } = await userClient.from('profiles').select('role,onboarding_complete,display_name,email_private').eq('id', userData.user.id).single();
+    const { data: profile } = await userClient.from('profiles').select('role,onboarding_complete,display_name,email_private,phone').eq('id', userData.user.id).single();
     if (profile?.role !== 'business_owner' || !profile.onboarding_complete) return json({ error: 'Complete business onboarding first' }, 403);
     const { data: business, error: businessError } = await userClient.from('businesses').select('id,name,owner_id').eq('owner_id', userData.user.id).single();
     if (businessError || !business) return json({ error: 'Owned business not found' }, 404);
@@ -79,14 +79,24 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
   let expiry = startAt;
   for (let i = 0; i < TOTAL_COUNT + 1; i += 1) expiry = addOneCalendarMonth(expiry);
   const subscriptionId = `fe_${business.id.slice(0, 18)}_${Date.now().toString(36)}`;
-  const customerPhone = stringValue(profile.phone) || stringValue(profile.phone_number) || '';
+
+  // Cashfree requires a customer_phone and rejects POST /subscriptions with a
+  // 400 when it is empty. Resolve + validate the owner's private phone BEFORE
+  // calling Cashfree, surfaced as a client-actionable code rather than a
+  // provider error. Normalised to the plain 10-digit Indian mobile Cashfree's
+  // customer_phone expects (e.g. "9908730221").
+  const ownerPhone = normalizeIndianMobile(stringValue(profile.phone) || stringValue(profile.phone_number));
+  if (!ownerPhone) {
+    return json({ error: 'Mobile number is required before payment.', code: 'OWNER_PHONE_REQUIRED' }, 422);
+  }
+
   const subscription = await cashfreeApi(env, '/subscriptions', 'POST', {
     subscription_id: subscriptionId,
     customer_details: {
       customer_id: userId,
       customer_name: stringValue(profile.display_name) || 'Founder.env owner',
       customer_email: stringValue(profile.email_private),
-      customer_phone: customerPhone,
+      customer_phone: ownerPhone,
     },
     plan_details: { plan_id: stringValue(plan.plan_id) || planId },
     authorization_details: {
@@ -167,4 +177,19 @@ function checkoutData(env: ReturnType<typeof cashfreeEnv>, subscriptionId: strin
 }
 
 function stringValue(value: unknown) { return typeof value === 'string' ? value : ''; }
+
+/**
+ * Normalise an Indian mobile to the plain 10-digit form Cashfree expects for
+ * customer_phone (e.g. "9908730221"). Accepts "+91 99087 30221", "91990873...",
+ * "099087...", or bare 10 digits. Returns '' when the input is not a valid
+ * Indian mobile so callers can surface an actionable phone-required error.
+ */
+function normalizeIndianMobile(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (/^91[6-9]\d{9}$/.test(digits)) return digits.slice(2);
+  if (/^0[6-9]\d{9}$/.test(digits)) return digits.slice(1);
+  if (/^[6-9]\d{9}$/.test(digits)) return digits;
+  return '';
+}
+
 function json(body: unknown, status = 200) { return new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } }); }

@@ -5,6 +5,7 @@ import { businessService, categoryService } from '@/services';
 import { dataMode } from '@/lib/supabase';
 import { useAuth } from '@/auth/AuthProvider';
 import { referralRewardsService } from '@/services/referralRewardsService';
+import { saveOwnerPhone } from '@/services/cashfreeService';
 import type { Category } from '@/types';
 import { cn } from '@/utils/format';
 
@@ -16,6 +17,7 @@ interface Draft {
   category: string;
   location: string;
   phone: string;
+  ownerPhone: string;
   whatsapp: string;
   email: string;
   description: string;
@@ -59,6 +61,7 @@ export function OnboardingPage() {
           category: 'Cafe',
           location: 'Pune, Maharashtra',
           phone: '+91 98765 43210',
+          ownerPhone: '+91 98765 43210',
           whatsapp: '+91 98765 43210',
           email: 'hello@cafearoma.in',
           description: 'Artisanal coffee house and organic bakery',
@@ -72,6 +75,7 @@ export function OnboardingPage() {
           category: '',
           location: '',
           phone: '',
+          ownerPhone: '',
           whatsapp: '',
           email: '',
           description: '',
@@ -164,6 +168,11 @@ export function OnboardingPage() {
       // Business already exists (created at the Referral step); finalise setup.
       await ensureBusiness();
       if (dataMode === 'supabase') {
+        if (!draft.ownerPhone.trim()) {
+          throw new Error('Your mobile number is required before activating.');
+        }
+        const { error: phoneError } = await saveOwnerPhone(draft.ownerPhone);
+        if (phoneError) throw new Error(phoneError.message);
         await completeBusinessOnboarding();
       }
       setStatusMessage({ type: 'success', text: 'Business profile saved! Opening your dashboard…' });
@@ -213,7 +222,8 @@ export function OnboardingPage() {
         )}
         {step === 7 && (
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Phone" value={draft.phone} onChange={(v) => update('phone', v)} />
+            <Field label="Business phone" value={draft.phone} onChange={(v) => update('phone', v)} />
+            <Field label="Your mobile number (owner)" value={draft.ownerPhone} onChange={(v) => update('ownerPhone', v)} hint="Used to set up secure AutoPay. Kept private — never shown on your public profile." />
             <Field label="WhatsApp" value={draft.whatsapp} onChange={(v) => update('whatsapp', v)} />
             <div className="sm:col-span-2">
               <Field label="Business email" value={draft.email} onChange={(v) => update('email', v)} />

@@ -24,13 +24,17 @@ interface CashfreeSdkInstance {
 interface CashfreeConstructor { new(options: { mode: string }): CashfreeSdkInstance; }
 declare global { interface Window { Cashfree?: CashfreeConstructor; } }
 
-interface FunctionsErrorLike { message?: string; context?: { provider?: { code?: string; status?: number | null }; error?: string } }
+interface FunctionsErrorLike { message?: string; context?: { provider?: { code?: string; status?: number | null }; error?: string; code?: string } }
 
 async function invoke<T>(body: Record<string, string>) {
   const { data, error } = await requireSupabase().functions.invoke<T>('cashfree-subscription', { body });
   if (error) {
     const message = error.message || 'Subscription request failed';
-    const provider = (error as FunctionsErrorLike)?.context?.provider;
+    const context = (error as FunctionsErrorLike)?.context;
+    const provider = context?.provider;
+    if (context?.code === 'OWNER_PHONE_REQUIRED') {
+      throw new Error('Add your mobile number to continue with payment.');
+    }
     if (provider?.code && provider.code !== 'timeout') {
       const status = typeof provider.status === 'number' ? ` (${provider.status})` : '';
       throw new Error(`Payment provider error: ${provider.code}${status}`);
@@ -60,6 +64,11 @@ async function loadCheckout() {
     document.head.appendChild(script);
   });
   if (!window.Cashfree) throw new Error('Cashfree Checkout is unavailable');
+}
+
+export function saveOwnerPhone(phone: string) {
+  const client = requireSupabase();
+  return client.rpc('save_owner_phone', { target_phone: phone });
 }
 
 export const cashfreeSubscriptionService = {

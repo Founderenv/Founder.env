@@ -13,6 +13,7 @@ export interface AuthProfile {
   displayName: string;
   avatarUrl: string | null;
   email: string | null;
+  phone: string | null;
   onboardingComplete: boolean;
   status: 'active' | 'suspended';
 }
@@ -66,6 +67,7 @@ function mapProfile(row: Record<string, unknown>): AuthProfile {
     displayName: String(row.display_name ?? ''),
     avatarUrl: typeof row.avatar_url === 'string' ? row.avatar_url : null,
     email: typeof row.email_private === 'string' ? row.email_private : null,
+    phone: typeof row.phone === 'string' && row.phone ? row.phone : null,
     onboardingComplete: Boolean(row.onboarding_complete),
     status: row.status === 'suspended' ? 'suspended' : 'active',
   };

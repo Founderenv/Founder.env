@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { CalendarClock, Check, CheckCircle2, CreditCard, Loader2, LogOut, ShieldCheck, Users } from 'lucide-react';
+import { CalendarClock, Check, CheckCircle2, CreditCard, Loader2, LogOut, ShieldCheck, Smartphone, Users } from 'lucide-react';
 import { useAuth } from '@/auth/AuthProvider';
 import { Logo } from '@/components/layout/Navigation';
 import { paymentProvider } from '@/services/paymentProvider';
-import { cashfreeSubscriptionService, type CashfreeCheckoutData } from '@/services/cashfreeService';
+import { cashfreeSubscriptionService, saveOwnerPhone, type CashfreeCheckoutData } from '@/services/cashfreeService';
 import { razorpaySubscriptionService, type RazorpayCheckoutData } from '@/services/razorpayService';
 import { referralRewardsService } from '@/services/referralRewardsService';
 import { isLiveCollectionPending } from '@/services/paymentConfig';
@@ -19,6 +19,11 @@ export function PaymentPendingPage() {
   const [appliedCode, setAppliedCode] = useState('');
   const [referralBusy, setReferralBusy] = useState(false);
   const [referralMessage, setReferralMessage] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [savingPhone, setSavingPhone] = useState(false);
+  const [phoneSaved, setPhoneSaved] = useState(false);
+
+  const needsPhone = !profile?.phone && !phoneSaved;
 
   useEffect(() => {
     if (!ownerBusiness?.businessId) return;
@@ -78,6 +83,19 @@ export function PaymentPendingPage() {
     } finally { setBusy(false); }
   }
 
+  async function savePhone() {
+    if (savingPhone) return;
+    setSavingPhone(true); setError('');
+    try {
+      const { error: rpcError } = await saveOwnerPhone(phoneInput);
+      if (rpcError) throw new Error(rpcError.message);
+      setPhoneSaved(true);
+      await refreshProfile();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Please enter a valid 10-digit mobile number.');
+    } finally { setSavingPhone(false); }
+  }
+
   return <div className="min-h-screen bg-gray-50 px-4 py-10 dark:bg-gray-950">
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex items-center justify-between"><Logo /><button id="payment-pending-signout" onClick={() => void signOut()} className="flex items-center gap-1.5 text-sm text-gray-500"><LogOut size={14} />Sign out</button></div>
@@ -101,7 +119,17 @@ export function PaymentPendingPage() {
           <div className="my-6 h-px bg-white/10" />
           <p className="text-sm text-gray-400">Then</p><p className="mt-1 text-2xl font-bold">₹199/month</p>
           <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-400"><CalendarClock size={16} className="mt-0.5 shrink-0" />Your first monthly bill is scheduled exactly one calendar month after activation. The subscription runs for up to 24 monthly charges.</p>
-          <button id="start-subscription" disabled={busy} onClick={() => void subscribe()} className="btn-primary mt-7 w-full justify-center disabled:cursor-wait disabled:opacity-70">{busy ? <><Loader2 size={17} className="animate-spin" />Opening secure checkout…</> : <><CreditCard size={17} />Pay ₹299 &amp; Enable AutoPay</>}</button>
+          <button id="start-subscription" disabled={busy || needsPhone} onClick={() => void subscribe()} className="btn-primary mt-7 w-full justify-center disabled:cursor-not-allowed disabled:opacity-60">{busy ? <><Loader2 size={17} className="animate-spin" />Opening secure checkout…</> : <><CreditCard size={17} />{needsPhone ? 'Add your mobile number to continue' : 'Pay ₹299 &amp; Enable AutoPay'}</>}</button>
+          {needsPhone && (
+            <div className="mt-7 rounded-2xl border border-amber-300/40 bg-amber-400/10 p-4">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-100"><Smartphone size={16} />Add your mobile number to continue</p>
+              <p className="mt-1 text-xs leading-5 text-amber-100/80">A valid mobile number is required to set up secure AutoPay. This stays private and is never shown on your public profile.</p>
+              <div className="mt-3 flex gap-2">
+                <input className="input w-full bg-gray-900 text-white placeholder:text-gray-500" value={phoneInput} type="tel" inputMode="numeric" placeholder="10-digit mobile number" onChange={(event) => setPhoneInput(event.target.value)} />
+                <button onClick={() => void savePhone()} disabled={savingPhone || !phoneInput.trim()} className="btn-primary shrink-0 disabled:opacity-60">{savingPhone && <Loader2 size={14} className="animate-spin" />}Save &amp; Continue</button>
+              </div>
+            </div>
+          )}
           {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/15 p-3 text-xs text-red-200">{error}</p>}
           {isLiveCollectionPending && <p className="mt-3 text-center text-[11px] leading-4 text-amber-300">Sandbox checkout — live collection is awaiting provider approval.</p>}
           <p className="mt-4 text-center text-[11px] leading-4 text-gray-500">No ₹199 monthly charge is collected today. By continuing, you authorise ₹199/month AutoPay starting one calendar month after activation for up to 24 monthly billing cycles, unless cancelled under the applicable subscription terms.</p>
