@@ -29,9 +29,14 @@ Deno.serve(async (request) => {
     const { data: business, error: businessError } = await userClient.from('businesses').select('id,name,owner_id').eq('owner_id', userData.user.id).single();
     if (businessError || !business) return json({ error: 'Owned business not found' }, 404);
 
-    if (body.action === 'create') return createSubscription(admin, env, business, profile, userData.user.id);
-    if (body.action === 'cancel') return cancelSubscription(admin, env, business.id);
-    if (body.action === 'status') return getStatus(admin, business.id);
+    // Await each async dispatch so a rejected (e.g. Cashfree provider) call is
+    // caught here and returned as a CORS-safe JSON diagnostic rather than
+    // becoming an unhandled rejection that Supabase turns into a bare
+    // EDGE_FUNCTION_ERROR 500 without Access-Control-Allow-Origin (which the
+    // browser then CORS-blocks as a transport failure).
+    if (body.action === 'create') return await createSubscription(admin, env, business, profile, userData.user.id);
+    if (body.action === 'cancel') return await cancelSubscription(admin, env, business.id);
+    if (body.action === 'status') return await getStatus(admin, business.id);
     return json({ error: 'Unsupported action' }, 400);
   } catch (error) {
     if (error instanceof CashfreeProviderError) {
