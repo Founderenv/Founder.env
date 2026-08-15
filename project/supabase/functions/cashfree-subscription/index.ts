@@ -54,24 +54,21 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
     return json({ error: 'This business already has a manual active plan' }, 409);
   }
   if (existing?.provider === 'cashfree' && existing.provider_subscription_id && !['cancelled', 'completed', 'expired'].includes(existing.provider_status)) {
-    // Return the existing checkout so the owner can continue/retry without a duplicate subscription.
-    return json(checkoutData(env, existing.provider_subscription_id, existing.subscription_session ?? '', business.name, existing.subscription_start_at, existing.provider_plan_id));
+    // Return the existing checkout so the owner can continue/retry without a duplicate
+    // subscription. First reconcile the provider plan so a stale id never leaves the
+    // owner stuck behind a checkout that references a deleted plan.
+    const existingPlanId = stringValue(existing.provider_plan_id) || `fe_biz_${business.id.slice(0, 18)}`;
+    await ensureCashfreePlan(env, existingPlanId);
+    return json(checkoutData(env, existing.provider_subscription_id, existing.subscription_session ?? '', business.name, existing.subscription_start_at, existingPlanId));
   }
 
-  // Ensure the Founder.env business plan exists (idempotent by deterministic plan id).
-  const planId = `fe_biz_${business.id.slice(0, 18)}`;
-  const plan = await cashfreeApi(env, '/plans', 'POST', {
-    plan_id: planId,
-    plan_name: 'Founder.env Business',
-    plan_type: 'PERIODIC',
-    plan_interval_type: 'MONTH',
-    plan_intervals: 1,
-    plan_recurring_amount: MONTHLY_FEE,
-    plan_max_cycles: TOTAL_COUNT,
-    plan_max_amount: Number((MONTHLY_FEE * TOTAL_COUNT).toFixed(2)),
-    plan_currency: 'INR',
-    plan_note: 'Founder.env ₹199/month for up to 24 cycles',
-  }).catch(() => ({ plan_id: planId }));
+  // Ensure the Founder.env recurring plan exists on the provider BEFORE creating the
+  // subscription. We reconcile rather than trust a locally-generated plan id: reuse an
+  // existing ACTIVE, correctly-priced plan; otherwise create it; and only proceed once
+  // the provider confirms the plan id. Any failure here throws → POST /subscriptions is
+  // never reached with a plan that may not exist (which Cashfree rejects with
+  // "Plan does not exist.").
+  const planId = await ensureCashfreePlan(env, `fe_biz_${business.id.slice(0, 18)}`);
 
   const startAt = addOneCalendarMonth(new Date());
   // Expiry must cover the full 24-month recurring run (auth + 24 monthly
@@ -98,7 +95,7 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
       customer_email: stringValue(profile.email_private),
       customer_phone: ownerPhone,
     },
-    plan_details: { plan_id: stringValue(plan.plan_id) || planId },
+    plan_details: { plan_id: planId },
     authorization_details: {
       authorization_amount: SETUP_FEE,
       authorization_amount_refund: false,
@@ -121,7 +118,7 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
   const { error } = await admin.rpc('register_cashfree_subscription', {
     target_business_id: business.id,
     target_subscription_id: cfSubscriptionId,
-    target_plan_id: stringValue(plan.plan_id) || planId,
+    target_plan_id: planId,
     target_start_at: startAt.toISOString(),
     target_session: subscriptionSessionId,
   });
@@ -156,6 +153,82 @@ async function cancelSubscription(admin: ReturnType<typeof createClient>, env: R
   }
   await admin.from('subscriptions').update({ status: 'cancelled', cancel_at_period_end: true, updated_at: new Date().toISOString() }).eq('id', stored.id);
   return json({ cancelAtPeriodEnd: true });
+}
+
+/**
+ * Reconcile the Founder.env recurring subscription plan with Cashfree. Returns the
+ * provider-confirmed plan id that MUST be used for POST /subscriptions.
+ *
+ * Behavior (never masks a failure):
+ *  1. If the deterministic plan id already exists and is ACTIVE with the expected
+ *     ₹199/month x 24-cycle pricing, reuse it.
+ *  2. Otherwise create it (POST /plans), handling the "already exists" window by
+ *     re-fetching, and confirm the resulting plan is usable.
+ *  3. Any other plan-creation/provider error is thrown, so subscription creation is
+ *     never attempted against a plan that Cashfree cannot confirm.
+ *
+ * The recurring plan represents the ₹199/month membership (24 cycles); the ₹299
+ * Day-1 setup amount stays on the subscription's authorization_details, not the plan.
+ */
+async function ensureCashfreePlan(env: ReturnType<typeof cashfreeEnv>, desiredPlanId: string): Promise<string> {
+  const planRequest = {
+    plan_id: desiredPlanId,
+    plan_name: 'Founder.env Business',
+    plan_type: 'PERIODIC',
+    plan_interval_type: 'MONTH',
+    plan_intervals: 1,
+    plan_recurring_amount: MONTHLY_FEE,
+    plan_max_cycles: TOTAL_COUNT,
+    plan_max_amount: Number((MONTHLY_FEE * TOTAL_COUNT).toFixed(2)),
+    plan_currency: 'INR',
+    plan_note: 'Founder.env ₹199/month for up to 24 cycles',
+  };
+
+  // 1. Reuse an existing ACTIVE, correctly-priced plan (idempotent across retries
+  //    and restarts). A GET + match is safer than assuming any stored id is valid.
+  const existing = await fetchPlan(env, desiredPlanId);
+  if (existing && planIsUsable(existing)) return stringValue(existing.plan_id) || desiredPlanId;
+
+  // 2. Create the plan (recover from a stale/missing plan without manual DB edits).
+  try {
+    const created = await cashfreeApi(env, '/plans', 'POST', planRequest);
+    if (planIsUsable(created)) return stringValue(created.plan_id) || desiredPlanId;
+    throw new CashfreeProviderError({ status: null, providerCode: 'INVALID_PLAN_RESPONSE', providerMessage: 'Cashfree plan creation returned an unusable plan', path: '/plans', elapsedMs: 0 }, 'Cashfree plan creation returned an unusable plan');
+  } catch (error) {
+    // Cashfree may race a concurrent create; if it reports the plan already exists,
+    // re-fetch and reuse it rather than masking the failure.
+    if (error instanceof CashfreeProviderError && isAlreadyExistsPlan(error)) {
+      const raced = await fetchPlan(env, desiredPlanId);
+      if (raced && planIsUsable(raced)) return stringValue(raced.plan_id) || desiredPlanId;
+    }
+    throw error;
+  }
+}
+
+/** Fetch a plan, returning null on 404 (not found) and propagating other errors. */
+async function fetchPlan(env: ReturnType<typeof cashfreeEnv>, planId: string): Promise<JsonRecord | null> {
+  try {
+    return await cashfreeApi(env, `/plans/${encodeURIComponent(planId)}`);
+  } catch (error) {
+    if (error instanceof CashfreeProviderError && error.provider.status === 404) return null;
+    throw error;
+  }
+}
+
+/** A plan is usable when ACTIVE and priced at ₹199/month up to 24 cycles. */
+function planIsUsable(plan: JsonRecord): boolean {
+  const status = stringValue(plan.plan_status).toUpperCase();
+  const recurring = Number(plan.plan_recurring_amount);
+  const cycles = Number(plan.plan_max_cycles);
+  return status === 'ACTIVE'
+    && Number.isFinite(recurring) && Math.abs(recurring - MONTHLY_FEE) < 0.01
+    && (Number.isFinite(cycles) && cycles === TOTAL_COUNT);
+}
+
+/** Detect a "plan already exists" response so we can safely reuse the existing plan. */
+function isAlreadyExistsPlan(error: CashfreeProviderError): boolean {
+  const text = `${error.provider.providerCode} ${error.provider.providerMessage}`.toLowerCase();
+  return /(already\s*exist|duplicate|plan.*exist|exist.*plan)/.test(text);
 }
 
 function checkoutData(env: ReturnType<typeof cashfreeEnv>, subscriptionId: string, subscriptionSessionId: string, businessName: string, startAt: string, planId?: string) {
