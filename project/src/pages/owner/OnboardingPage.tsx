@@ -175,10 +175,10 @@ export function OnboardingPage() {
         if (phoneError) throw new Error(phoneError.message);
         await completeBusinessOnboarding();
       }
-      setStatusMessage({ type: 'success', text: 'Business profile saved! Opening your dashboard…' });
-      navigate('/business/dashboard', { replace: true });
+      setStatusMessage({ type: 'success', text: 'Business profile saved! Heading to secure payment…' });
+      navigate('/owner/payment-pending', { replace: true });
     } catch (err: unknown) {
-      setStatusMessage({ type: 'error', text: (err as Error).message || 'Failed to save business profile.' });
+      setStatusMessage({ type: 'error', text: (err as Error).message || 'Could not continue. Please try again.' });
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -244,19 +244,23 @@ export function OnboardingPage() {
           <button
             onClick={async () => {
               if (step === steps.length - 2) {
+                // Referral is the FINAL setup step: both "Apply referral" and
+                // "Skip referral" land the owner on the existing payment page.
+                // Complete the onboarding (reusing the owned business) and go
+                // straight to /owner/payment-pending rather than the obsolete
+                // intermediate Activate screen. Errors surface via statusMessage.
                 setPreparing(true);
-                try { await ensureBusiness(); setStep((s) => Math.min(steps.length - 1, s + 1)); }
-                catch { /* ensureBusiness surfaces the error via statusMessage */ }
+                try { await handleSaveBusiness(); }
                 finally { setPreparing(false); }
               } else {
                 setStep((s) => Math.min(steps.length - 1, s + 1));
               }
             }}
-            disabled={preparing}
+            disabled={preparing || saving}
             className="btn-primary"
           >
-            {preparing ? <Loader2 size={16} className="animate-spin" /> : null}
-            {preparing ? 'Preparing…' : <>Continue <ArrowRight size={16} /></>}
+            {preparing || saving ? <Loader2 size={16} className="animate-spin" /> : null}
+            {preparing || saving ? 'Preparing…' : <>Continue <ArrowRight size={16} /></>}
           </button>
         ) : (
           <button onClick={handleSaveBusiness} disabled={saving} className="btn-primary">
