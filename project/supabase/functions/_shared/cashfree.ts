@@ -30,7 +30,7 @@ export function cashfreeEnv(): CashfreeEnv {
     clientId: required('CASHFREE_CLIENT_ID'),
     clientSecret: required('CASHFREE_CLIENT_SECRET'),
     env: (Deno.env.get('CASHFREE_ENV') || 'sandbox') as 'sandbox' | 'production',
-    apiVersion: Deno.env.get('CASHFREE_API_VERSION') || '2025-07-08',
+    apiVersion: Deno.env.get('CASHFREE_API_VERSION') || '2025-01-01',
     webhookSecret: Deno.env.get('CASHFREE_WEBHOOK_SECRET') || '',
   };
   if (base.env !== 'production') base.env = 'sandbox';
@@ -105,15 +105,16 @@ export function addOneCalendarMonth(date: Date) {
 }
 
 /**
- * Verify the Cashfree webhook signature. Cashfree signs `${timestamp}.${rawBody}`
- * with HMAC-SHA256 and base64-encodes it into the `x-webhook-signature` header,
- * with the timestamp in the `x-webhook-timestamp` header.
+ * Verify the Cashfree webhook signature. Cashfree signs `timestamp + rawBody`
+ * (no separator) with HMAC-SHA256 and base64-encodes it into the
+ * `x-webhook-signature` header, with the timestamp in the `x-webhook-timestamp`
+ * header. The raw request body must be used verbatim.
  */
 export async function verifyWebhookSignature(rawBody: string, timestamp: string | null, signature: string | null): Promise<boolean> {
   if (!timestamp || !signature) return false;
   const secret = required('CASHFREE_WEBHOOK_SECRET');
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}.${rawBody}`));
+  const digest = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`${timestamp}${rawBody}`));
   const expected = btoa(String.fromCharCode(...new Uint8Array(digest)));
   if (expected.length !== signature.length) return false;
   let mismatch = 0;

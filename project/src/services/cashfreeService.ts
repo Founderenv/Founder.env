@@ -5,7 +5,7 @@ export interface CashfreeCheckoutData {
   env: string;
   clientId: string;
   apiVersion: string;
-  paymentSessionId: string | null;
+  subscriptionSessionId: string;
   subscriptionId: string;
   planId?: string;
   businessName: string;
@@ -19,7 +19,7 @@ export interface CashfreeCheckoutData {
 export type CashfreeOutcome = 'success' | 'cancelled' | 'error';
 
 interface CashfreeSdkInstance {
-  checkout: (options: { paymentSessionId: string }) => Promise<{ paymentStatus?: string; orderId?: string; message?: string }>;
+  subscriptionsCheckout: (options: { subsSessionId: string; redirectTarget?: string }) => Promise<{ error?: { message?: string } }>;
 }
 interface CashfreeConstructor { new(options: { mode: string }): CashfreeSdkInstance; }
 declare global { interface Window { Cashfree?: CashfreeConstructor; } }
@@ -67,17 +67,24 @@ export const cashfreeSubscriptionService = {
   cancel: () => invoke<{ cancelAtPeriodEnd: boolean }>({ action: 'cancel' }),
   status: () => invoke<{ subscription: { id: string; status: string; providerStatus: string; setupFeePaid: boolean; autopayAuthorized: boolean; businessActive?: boolean } | null }>({ action: 'status' }),
   async openCheckout(data: CashfreeCheckoutData): Promise<CashfreeOutcome> {
-    if (!data.paymentSessionId) return 'error';
+    if (!data.subscriptionSessionId) return 'error';
     await loadCheckout();
     const cashfree = new window.Cashfree!({ mode: data.env });
     try {
-      const result = await cashfree.checkout({ paymentSessionId: data.paymentSessionId });
-      const status = (result?.paymentStatus || '').toUpperCase();
-      if (status === 'SUCCESS') return 'success';
-      if (status === 'CANCELLED') return 'cancelled';
-      return 'error';
+      // Subscription authorization checkout — drives the ₹299 authorization + mandate.
+      // Opened in a new tab so the SPA (and its activation polling) stays alive;
+      // the promise resolves when the checkout completes/closes.
+      const result = await cashfree.subscriptionsCheckout({ subsSessionId: data.subscriptionSessionId, redirectTarget: '_blank' });
+      if (result?.error?.message) {
+        console.error('[Cashfree Subscription Checkout]', result.error.message);
+        return 'error';
+      }
+      // The checkout resolves cleanly once the customer returns. Actual
+      // activation is confirmed server-side via the signed Cashfree webhook;
+      // a clean return here just means the payment/mandate flow was entered.
+      return 'success';
     } catch (cause) {
-      console.error('[Cashfree Checkout]', cause);
+      console.error('[Cashfree Subscription Checkout]', cause);
       return 'error';
     }
   },

@@ -17,5 +17,8 @@ enabled = true
 [functions.razorpay-webhook]
 verify_jwt = false
 
+[functions.cashfree-webhook]
+verify_jwt = false
+
 [functions.ai-content-studio]
 verify_jwt = true

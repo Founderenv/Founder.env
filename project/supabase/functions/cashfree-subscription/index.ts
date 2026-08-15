@@ -55,7 +55,7 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
   }
   if (existing?.provider === 'cashfree' && existing.provider_subscription_id && !['cancelled', 'completed', 'expired'].includes(existing.provider_status)) {
     // Return the existing checkout so the owner can continue/retry without a duplicate subscription.
-    return json(checkoutData(env, existing.provider_subscription_id, business.name, existing.subscription_start_at));
+    return json(checkoutData(env, existing.provider_subscription_id, existing.subscription_session ?? '', business.name, existing.subscription_start_at, existing.provider_plan_id));
   }
 
   // Ensure the Founder.env business plan exists (idempotent by deterministic plan id).
@@ -74,6 +74,10 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
   }).catch(() => ({ plan_id: planId }));
 
   const startAt = addOneCalendarMonth(new Date());
+  // Expiry must cover the full 24-month recurring run (auth + 24 monthly
+  // charges), so push it out 25 calendar months from the start, not 1.
+  let expiry = startAt;
+  for (let i = 0; i < TOTAL_COUNT + 1; i += 1) expiry = addOneCalendarMonth(expiry);
   const subscriptionId = `fe_${business.id.slice(0, 18)}_${Date.now().toString(36)}`;
   const customerPhone = stringValue(profile.phone) || stringValue(profile.phone_number) || '';
   const subscription = await cashfreeApi(env, '/subscriptions', 'POST', {
@@ -90,43 +94,30 @@ async function createSubscription(admin: ReturnType<typeof createClient>, env: R
       authorization_amount_refund: false,
     },
     subscription_first_charge_time: startAt.toISOString(),
-    subscription_expiry_time: addOneCalendarMonth(startAt).toISOString(),
+    subscription_expiry_time: expiry.toISOString(),
     subscription_note: 'Founder.env business subscription',
     subscription_tags: { business_id: business.id, billing_model: 'setup_then_calendar_monthly' },
   });
 
   const cfSubscriptionId = stringValue(subscription.cf_subscription_id) || subscriptionId;
+  // The subscription authorization checkout must use the Cashfree subscription
+  // session returned by POST /subscriptions — NOT a separate PG order's
+  // payment_session_id. This session drives the ₹299 authorization + mandate.
+  const subscriptionSessionId = stringValue(subscription.subscription_session_id) || '';
+  if (!subscriptionSessionId) {
+    throw new Error('Cashfree did not return a subscription session; cannot start checkout');
+  }
+
   const { error } = await admin.rpc('register_cashfree_subscription', {
     target_business_id: business.id,
     target_subscription_id: cfSubscriptionId,
     target_plan_id: stringValue(plan.plan_id) || planId,
     target_start_at: startAt.toISOString(),
+    target_session: subscriptionSessionId,
   });
   if (error) throw new Error(error.message);
 
-  // Create a Payment Order so the Cashfree hosted checkout has a session for the
-  // ₹299 authorisation charge. Returns only the safe session id to the browser.
-  let paymentSessionId: string | null = null;
-  try {
-    const order = await cashfreeApi(env, '/orders', 'POST', {
-      order_id: `fe_auth_${cfSubscriptionId.slice(-24)}`,
-      order_amount: SETUP_FEE,
-      order_currency: 'INR',
-      customer_details: {
-        customer_id: userId,
-        customer_name: stringValue(profile.display_name) || 'Founder.env owner',
-        customer_email: stringValue(profile.email_private),
-        customer_phone: customerPhone,
-      },
-      order_meta: { notify_url: `${env.supabaseUrl}/functions/v1/cashfree-webhook` },
-      order_tags: { business_id: business.id, subscription_id: cfSubscriptionId },
-    });
-    paymentSessionId = stringValue(order.payment_session_id) || null;
-  } catch (e) {
-    console.error('Cashfree order session failed (falling back to subscription-only):', e instanceof Error ? e.message : e);
-  }
-
-  return json(checkoutData(env, cfSubscriptionId, business.name, startAt.toISOString(), paymentSessionId, planId));
+  return json(checkoutData(env, cfSubscriptionId, subscriptionSessionId, business.name, startAt.toISOString(), planId));
 }
 
 async function getStatus(admin: ReturnType<typeof createClient>, businessId: string) {
@@ -157,13 +148,13 @@ async function cancelSubscription(admin: ReturnType<typeof createClient>, env: R
   return json({ cancelAtPeriodEnd: true });
 }
 
-function checkoutData(env: ReturnType<typeof cashfreeEnv>, subscriptionId: string, businessName: string, startAt: string, paymentSessionId: string | null = null, planId?: string) {
+function checkoutData(env: ReturnType<typeof cashfreeEnv>, subscriptionId: string, subscriptionSessionId: string, businessName: string, startAt: string, planId?: string) {
   return {
     provider: 'cashfree',
     env: env.env,
     clientId: env.clientId,
     apiVersion: env.apiVersion,
-    paymentSessionId,
+    subscriptionSessionId,
     subscriptionId,
     planId,
     businessName,
