@@ -24,20 +24,20 @@ const customerNav: NavItem[] = [
 
 const ownerNav: NavItem[] = [
   { to: '/business/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/owner/ai-content', label: 'AI Content Studio', icon: WandSparkles },
-  { to: '/', label: 'Home', icon: Home },
+  { to: '/explore', label: 'Home', icon: Home },
   { to: '/owner/create', label: 'Create', icon: Plus },
   { to: '/owner/profile', label: 'Profile', icon: User },
   { to: '/messages', label: 'Messages', icon: MessageCircle },
   { to: '/owner/analytics', label: 'Analytics', icon: BarChart3 },
+  { to: '/owner/ai-content', label: 'AI Content Studio', icon: WandSparkles },
   { to: '/owner/qr', label: 'QR', icon: Menu },
 ];
 
 const ownerMobileNav: NavItem[] = [
-  { to: '/', label: 'Home', icon: Home },
+  { to: '/explore', label: 'Home', icon: Home },
   { to: '/messages', label: 'Message', icon: MessageCircle },
-  { to: '/owner/ai-content', label: 'AI Studio', icon: WandSparkles },
   { to: '/owner/create', label: 'Create', icon: Plus },
+  { to: '/owner/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/owner/profile', label: 'Profile', icon: User },
 ];
 

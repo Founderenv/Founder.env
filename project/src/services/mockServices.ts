@@ -176,6 +176,11 @@ export const mockPostService = {
   async getSaved(): Promise<Post[]> {
     return delay(clone(posts.filter((p) => p.isSaved)));
   },
+  async remove(id: string): Promise<void> {
+    const idx = posts.findIndex((p) => p.id === id);
+    if (idx >= 0) posts.splice(idx, 1);
+    return delay(undefined);
+  },
 };
 
 export const mockDealService = {
@@ -222,6 +227,11 @@ export const mockDealService = {
       d.businessName.toLowerCase().includes(q) ||
       d.category.toLowerCase().includes(q)
     )));
+  },
+  async remove(id: string): Promise<void> {
+    const idx = deals.findIndex((d) => d.id === id);
+    if (idx >= 0) deals.splice(idx, 1);
+    return delay(undefined);
   },
 };
 

@@ -262,16 +262,16 @@ export function BusinessProfile() {
         {!dataLoaded ? (
           <LoadingSpinner size={32} className="py-12" />
         ) : activeTab === 'page' ? (
-          <BusinessPageTab business={business} reviews={reviews} deals={deals.filter((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now())} posts={posts} onComment={setCommentPost} />
+          <BusinessPageTab business={business} reviews={reviews} deals={deals.filter((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now())} posts={posts} onComment={setCommentPost} onPostDeleted={(id) => setPosts((cur) => cur.filter((x) => x.id !== id))} onDealDeleted={(id) => setDeals((cur) => cur.filter((x) => x.id !== id))} />
         ) : activeTab === 'deals' ? (
           deals.some((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now()) ? (
-            <div className="space-y-4">{deals.filter((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now()).map((d) => <DealCard key={d.id} deal={d} />)}</div>
+            <div className="space-y-4">{deals.filter((deal) => Date.parse(deal.startDate) <= Date.now() && Date.parse(deal.endDate) >= Date.now()).map((d) => <DealCard key={d.id} deal={d} onDeleted={(id) => setDeals((cur) => cur.filter((x) => x.id !== id))} />)}</div>
           ) : (
             <EmptyState icon="Tag" title="No deals available" description="Check back later for exclusive offers." />
           )
         ) : activeTab === 'posts' ? (
           posts.length > 0 ? (
-            <div className="space-y-4">{posts.map((p) => <PostCard key={p.id} post={p} onComment={setCommentPost} />)}</div>
+            <div className="space-y-4">{posts.map((p) => <PostCard key={p.id} post={p} onComment={setCommentPost} onDeleted={(id) => setPosts((cur) => cur.filter((x) => x.id !== id))} />)}</div>
           ) : (
             <EmptyState icon="Image" title="No posts yet" />
           )
@@ -306,7 +306,7 @@ export function BusinessProfile() {
   );
 }
 
-function BusinessPageTab({ business, reviews, deals, posts, onComment }: { business: import('@/types').Business; reviews: Review[]; deals: Deal[]; posts: Post[]; onComment: (post: Post) => void }) {
+function BusinessPageTab({ business, reviews, deals, posts, onComment, onPostDeleted, onDealDeleted }: { business: import('@/types').Business; reviews: Review[]; deals: Deal[]; posts: Post[]; onComment: (post: Post) => void; onPostDeleted: (id: string) => void; onDealDeleted: (id: string) => void }) {
   return (
     <div className="space-y-6">
       {business.todayOffer && (
@@ -316,9 +316,9 @@ function BusinessPageTab({ business, reviews, deals, posts, onComment }: { busin
         </div>
       )}
 
-      {deals.length > 0 && <section><h2 className="section-title mb-3">Featured Deals</h2><div className="space-y-4">{deals.slice(0, 2).map((deal) => <DealCard key={deal.id} deal={deal} />)}</div></section>}
+      {deals.length > 0 && <section><h2 className="section-title mb-3">Featured Deals</h2><div className="space-y-4">{deals.slice(0, 2).map((deal) => <DealCard key={deal.id} deal={deal} onDeleted={onDealDeleted} />)}</div></section>}
 
-      {posts.length > 0 && <section><h2 className="section-title mb-3">Recent Posts</h2><div className="space-y-4">{posts.slice(0, 2).map((post) => <PostCard key={post.id} post={post} onComment={onComment} />)}</div></section>}
+      {posts.length > 0 && <section><h2 className="section-title mb-3">Recent Posts</h2><div className="space-y-4">{posts.slice(0, 2).map((post) => <PostCard key={post.id} post={post} onComment={onComment} onDeleted={onPostDeleted} />)}</div></section>}
 
       {business.featuredProducts.length > 0 && (
         <section>

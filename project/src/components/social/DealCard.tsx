@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Clock, Tag, Bookmark, Flame, Check, Loader2 } from 'lucide-react';
+import { Clock, Tag, Bookmark, Flame, Check, Loader2, MoreHorizontal, Trash2, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge } from '@/components/ui/StatusBadge';
 import { ShareButton } from '@/components/ui/ShareSheet';
@@ -15,14 +15,18 @@ interface DealCardProps {
   deal: Deal;
   onClaim?: (deal: Deal) => void;
   compact?: boolean;
+  onDeleted?: (dealId: string) => void;
 }
 
-export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps) {
+export function DealCard({ deal: initialDeal, onClaim, compact, onDeleted }: DealCardProps) {
   const [deal, setDeal] = useState(initialDeal);
   const [claimOpen, setClaimOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [claim, setClaim] = useState<DealClaim | null>(null);
   const [actionError, setActionError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,6 +35,23 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
   const isExpired = Date.parse(deal.endDate) < now;
   const isSoldOut = deal.maxClaims > 0 && deal.claimedCount >= deal.maxClaims;
   const unavailableLabel = isScheduled ? 'Scheduled' : isExpired ? 'Expired' : isSoldOut ? 'Fully Claimed' : '';
+  const isOwnBusiness = auth.profile?.role === 'business_owner' && auth.ownerBusiness?.businessId === deal.businessId;
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setActionError('');
+    try {
+      await dealService.remove(deal.id);
+      setDeleteOpen(false);
+      setMenuOpen(false);
+      onDeleted?.(deal.id);
+    } catch (caught: unknown) {
+      setActionError(caught instanceof Error ? caught.message : 'This deal could not be deleted.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleClaim = () => {
     if (auth.isBackendMode && (!auth.user || auth.profile?.role !== 'customer')) {
@@ -113,7 +134,30 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">{deal.businessCategory} • {deal.city}</p>
         </div>
-        <ShareButton title={`${deal.title} from ${deal.businessName}`} url={`/business/${deal.businessUsername}/deals`} />
+          <div className="flex items-center gap-2">
+            <ShareButton title={`${deal.title} from ${deal.businessName}`} url={`/business/${deal.businessUsername}/deals`} />
+            {isOwnBusiness && (
+              <div className="relative">
+                <button onClick={() => setMenuOpen((v) => !v)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Manage deal">
+                  {menuOpen ? <X size={18} /> : <MoreHorizontal size={18} />}
+                </button>
+                {menuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+                    <div className="absolute right-0 top-10 z-50 min-w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950 animate-slide-up">
+                      <button
+                        type="button"
+                        onClick={() => { setDeleteOpen(true); setMenuOpen(false); }}
+                        className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10"
+                      >
+                        <Trash2 size={16} /> Delete Deal
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
       </div>
 
       <Link to={`/business/${deal.businessUsername}/deals`}>
@@ -210,6 +254,18 @@ export function DealCard({ deal: initialDeal, onClaim, compact }: DealCardProps)
             </button>
           )}
           {actionError && <p className="rounded-lg bg-error-50 p-3 text-sm text-error-600 dark:bg-error-500/10">{actionError}</p>}
+        </div>
+      </Modal>
+      <Modal open={deleteOpen} onClose={() => !deleting && setDeleteOpen(false)} title="Delete this deal?" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">Customers will no longer be able to view or claim it. Deal claim history is preserved.</p>
+          <div className="flex gap-3">
+            <button type="button" disabled={deleting} onClick={() => setDeleteOpen(false)} className="btn-outline flex-1">Cancel</button>
+            <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-error-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-error-700 disabled:opacity-60">
+              {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

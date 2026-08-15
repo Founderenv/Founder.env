@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, Bookmark, Repeat2, MoreHorizontal, MapPin, Tag } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Repeat2, MoreHorizontal, MapPin, Tag, Trash2, Loader2, X } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { VerifiedBadge } from '@/components/ui/StatusBadge';
 import { FollowButton } from '@/components/ui/FollowButton';
@@ -13,16 +13,36 @@ import { useAuth } from '@/auth/AuthProvider';
 interface PostCardProps {
   post: Post;
   onComment?: (post: Post) => void;
+  onDeleted?: (postId: string) => void;
 }
 
-export function PostCard({ post: initialPost, onComment }: PostCardProps) {
+export function PostCard({ post: initialPost, onComment, onDeleted }: PostCardProps) {
   const [post, setPost] = useState(initialPost);
   const [actionError, setActionError] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const auth = useAuth();
   const navigate = useNavigate();
   const followPending = useRef(false);
   const postActionPending = useRef(false);
   const isOwnBusiness = auth.profile?.role === 'business_owner' && auth.ownerBusiness?.businessId === post.businessId;
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setActionError('');
+    try {
+      await postService.remove(post.id);
+      setDeleteOpen(false);
+      setMenuOpen(false);
+      onDeleted?.(post.id);
+    } catch (caught: unknown) {
+      setActionError(caught instanceof Error ? caught.message : 'This post could not be deleted.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const runCustomerAction = async (action: () => Promise<Post | null>) => {
     if (auth.isBackendMode && (!auth.user || auth.profile?.role !== 'customer')) {
@@ -91,9 +111,31 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
           {!isOwnBusiness && !post.isFollowing && (
             <FollowButton isFollowing={post.isFollowing} onToggle={() => void followBusiness()} size="sm" />
           )}
-          <button onClick={() => window.alert('Content reporting options will be submitted through the backend.')} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="More">
-            <MoreHorizontal size={18} />
-          </button>
+          <div className="relative">
+            <button onClick={() => setMenuOpen((v) => !v)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="More">
+              {menuOpen ? <X size={18} /> : <MoreHorizontal size={18} />}
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+                <div className="absolute right-0 top-10 z-50 min-w-44 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-950 animate-slide-up">
+                  {isOwnBusiness ? (
+                    <button
+                      type="button"
+                      onClick={() => { setDeleteOpen(true); setMenuOpen(false); }}
+                      className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10"
+                    >
+                      <Trash2 size={16} /> Delete Post
+                    </button>
+                  ) : (
+                    <button onClick={() => window.alert('Content reporting options will be submitted through the backend.')} className="flex w-full items-center gap-2.5 px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800">
+                      <MoreHorizontal size={16} /> Report
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -176,6 +218,24 @@ export function PostCard({ post: initialPost, onComment }: PostCardProps) {
           )}
         </div>
       </div>
+
+      {deleteOpen && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => !deleting && setDeleteOpen(false)} aria-hidden="true" />
+          <div className="relative w-full max-w-sm rounded-b-none rounded-2xl bg-white p-5 shadow-2xl animate-slide-up sm:rounded-2xl dark:bg-gray-950 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Delete this post?</h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">This action cannot be undone.</p>
+            {actionError && <p className="mt-3 rounded-lg bg-error-50 p-2.5 text-xs text-error-600 dark:bg-error-500/10 dark:text-error-400">{actionError}</p>}
+            <div className="mt-5 flex gap-3">
+              <button type="button" disabled={deleting} onClick={() => setDeleteOpen(false)} className="btn-outline flex-1">Cancel</button>
+              <button type="button" disabled={deleting} onClick={() => void handleDelete()} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-error-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-error-700 disabled:opacity-60">
+                {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </article>
   );
 }
