@@ -205,12 +205,21 @@ async function ensureCashfreePlan(env: ReturnType<typeof cashfreeEnv>, desiredPl
   }
 }
 
-/** Fetch a plan, returning null on 404 (not found) and propagating other errors. */
+/** Fetch a plan, returning null on not-found and propagating other errors. */
 async function fetchPlan(env: ReturnType<typeof cashfreeEnv>, planId: string): Promise<JsonRecord | null> {
   try {
     return await cashfreeApi(env, `/plans/${encodeURIComponent(planId)}`);
   } catch (error) {
-    if (error instanceof CashfreeProviderError && error.provider.status === 404) return null;
+    if (error instanceof CashfreeProviderError) {
+      if (error.provider.status === 404) return null;
+      // Cashfree returns HTTP 400 invalid_request_error "Plan does not exist."
+      // for missing plans — treat as not-found so ensureCashfreePlan can create it.
+      if (error.provider.status === 400
+        && error.provider.providerCode === 'invalid_request_error'
+        && /plan does not exist/i.test(error.provider.providerMessage)) {
+        return null;
+      }
+    }
     throw error;
   }
 }
